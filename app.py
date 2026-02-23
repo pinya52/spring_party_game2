@@ -287,7 +287,49 @@ def api_process_image():
         })
         return jsonify({'success': True, 'image': result, 'style': style})
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/diffusion', methods=['POST'])
+def api_diffusion():
+    """用 Stable Horde 把輪廓轉成細緻圖"""
+    data = request.json
+    image_data = data.get('image')
+    style = data.get('style', 'realistic')
+    if not image_data:
+        return jsonify({'error': '缺少圖片資料'}), 400
+    try:
+        result = diffusion_generate(image_data, style)
+        game_state['ai_image'] = result
+        game_state['ai_style'] = style
+        q_idx = game_state['current_question']
+        q = game_state['questions'][q_idx] if game_state['questions'] else {}
+        socketio.emit('ai_image_generated', {
+            'image': result,
+            'style': style,
+            'description': q.get('description', ''),
+        })
+        return jsonify({'success': True, 'image': result, 'style': style})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/reset', methods=['POST'])
+def api_reset():
+    """重置遊戲狀態"""
+    game_state['status'] = 'waiting'
+    game_state['questions'] = []
+    game_state['current_question'] = 0
+    game_state['participants'] = {}
+    game_state['answers'] = {}
+    game_state['canvas_data'] = None
+    game_state['ai_image'] = None
+    game_state['ai_style'] = None
+    game_state['drawing_active'] = False
+    socketio.emit('game_reset', {})
+    return jsonify({'success': True})
 
 @socketio.on('connect')
 def on_connect():
@@ -474,11 +516,6 @@ def on_admin_show_result():
 @socketio.on('timer_ended')
 def on_timer_ended():
     # show.html 倒數結束時觸發，效果等同管理員手動公布
-    _auto_show_result()
-
-# ── timer ended on client, force show result ──
-@socketio.on('timer_ended')
-def on_timer_ended():
     _auto_show_result()
 
 def _current_question():
