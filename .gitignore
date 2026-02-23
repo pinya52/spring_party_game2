@@ -1,0 +1,7 @@
+cat > .gitignore << 'EOF'
+game2/
+__pycache__/
+*.pyc
+*.pyo
+.env
+EOF

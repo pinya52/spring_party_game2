@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理員控制台 — 你畫我猜</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0e0e14;
+    --surface: #16161f;
+    --surface2: #1e1e2e;
+    --accent: #7c3aed;
+    --accent2: #a855f7;
+    --green: #22c55e;
+    --red: #ef4444;
+    --orange: #f97316;
+    --yellow: #eab308;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --border: #2a2a3e;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; min-height: 100vh; }
+  
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  header h1 { font-size: 1.4rem; font-weight: 900; }
+  header h1 span { color: var(--accent2); }
+  .badge { background: var(--accent); color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 99px; font-family: 'Space Mono', monospace; }
+  
+  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; height: calc(100vh - 57px); overflow: hidden; }
+  
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  
+  .main { overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+  
+  .card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+  }
+  .card-title {
+    font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 14px;
+    font-family: 'Space Mono', monospace;
+  }
+  
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: 'Noto Sans TC', sans-serif; font-weight: 700; font-size: 0.9rem;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn-green { background: var(--green); color: #fff; }
+  .btn-green:hover { filter: brightness(1.15); }
+  .btn-orange { background: var(--orange); color: #fff; }
+  .btn-orange:hover { filter: brightness(1.15); }
+  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  .btn-ghost:hover { background: var(--surface); color: var(--text); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+  
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  
+  /* Form */
+  input, textarea, select {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: 9px 12px; font-family: 'Noto Sans TC', sans-serif;
+    font-size: 0.9rem; width: 100%; transition: border-color 0.15s;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent2); }
+  label { font-size: 0.82rem; color: var(--muted); margin-bottom: 4px; display: block; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  
+  /* Status */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 99px; padding: 4px 12px; font-size: 0.8rem;
+    font-family: 'Space Mono', monospace;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+  
+  /* Participants */
+  .participant-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+  .participant-item {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--bg); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem;
+  }
+  .participant-item .score { color: var(--accent2); font-family: 'Space Mono', monospace; font-weight: 700; }
+  
+  /* Canvas */
+  #drawCanvas {
+    display: block; border-radius: 10px; border: 2px solid var(--border);
+    cursor: crosshair; background: #fff; width: 100%; max-width: 100%;
+    touch-action: none;
+  }
+  .canvas-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tool-group { display: flex; align-items: center; gap: 6px; }
+  .color-swatch {
+    width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+    border: 3px solid transparent; transition: border-color 0.15s;
+  }
+  .color-swatch.active { border-color: var(--accent2); }
+  #colorPicker { width: 36px; height: 36px; padding: 2px; border-radius: 6px; cursor: pointer; }
+  #brushSize { width: 80px; }
+  
+  /* AI styles */
+  .ai-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+  .ai-style-btn {
+    background: var(--bg); border: 2px solid var(--border); border-radius: 10px;
+    padding: 10px 8px; text-align: center; cursor: pointer; transition: all 0.15s;
+    font-size: 0.8rem; color: var(--text);
+  }
+  .ai-style-btn:hover { border-color: var(--accent); }
+  .ai-style-btn.selected { border-color: var(--accent2); background: rgba(168,85,247,0.1); }
+  .ai-style-btn .emoji { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+  
+  /* AI preview */
+  #aiPreview { max-width: 100%; border-radius: 10px; border: 2px solid var(--accent); margin-top: 10px; display: none; }
+  
+  /* Questions */
+  .q-item {
+    background: var(--bg); border-radius: 8px; padding: 10px 14px;
+    margin-bottom: 8px; font-size: 0.85rem; border-left: 3px solid var(--accent);
+  }
+  .q-item .q-desc { font-weight: 700; margin-bottom: 4px; }
+  .q-item .q-options { color: var(--muted); font-size: 0.78rem; }
+  
+  /* Progress bar */
+  .progress-bar { background: var(--border); border-radius: 99px; height: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 99px; transition: width 0.3s; }
+  
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab { padding: 8px 16px; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 0.85rem; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  
+  /* Toast */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 20px; font-size: 0.88rem;
+    transform: translateY(80px); opacity: 0; transition: all 0.3s;
+    z-index: 999; max-width: 300px;
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+  #toast.success { border-color: var(--green); color: var(--green); }
+  #toast.error { border-color: var(--red); color: var(--red); }
+
+  .answer-progress { font-family: 'Space Mono', monospace; font-size: 1.1rem; color: var(--accent2); text-align: center; padding: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎮 你畫我猜 <span>Admin</span></h1>
+  <span class="badge">管理員控制台</span>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+    <div class="status-pill"><div class="dot" id="connDot"></div><span id="connText">連線中...</span></div>
+    <div class="status-pill">狀態：<strong id="gameStatusText">等待中</strong></div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <!-- 遊戲控制 -->
+    <div class="card">
+      <div class="card-title">🎮 遊戲控制</div>
+      <div class="btn-row" style="margin-bottom:12px;">
+        <button class="btn btn-green" id="btnStart" onclick="startGame()">▶ 開始遊戲</button>
+        <button class="btn btn-orange" id="btnOpen" onclick="openAnswer()" disabled>🔓 開放答題</button>
+      </div>
+      <div class="btn-row" style="margin-bottom:12px;">
+        <button class="btn btn-primary" id="btnResult" onclick="showResult()" disabled>📊 公布結果</button>
+        <button class="btn btn-ghost" id="btnNext" onclick="nextQuestion()" disabled>⏭ 下一題</button>
+      </div>
+      <div id="progressWrap" style="display:none">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.82rem;color:var(--muted);">
+          <span>題目進度</span><span id="qProgress">0 / 0</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      </div>
+      <div class="answer-progress" id="answerProgress" style="display:none"></div>
+    </div>
+
+    <!-- 參賽者 -->
+    <div class="card">
+      <div class="card-title">👥 參賽者 (<span id="participantCount">0</span>/20)</div>
+      <div class="participant-list" id="participantList">
+        <div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:16px;">尚無參賽者加入</div>
+      </div>
+    </div>
+
+    <!-- 題目清單 -->
+    <div class="card">
+      <div class="card-title">📋 題目清單 (<span id="qCount">0</span> 題)</div>
+      <div id="questionList" style="max-height:300px;overflow-y:auto;"></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- 題目設定 -->
+    <div class="card">
+      <div class="card-title">📝 題目設定</div>
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('csv')">CSV 批量導入</div>
+        <div class="tab" onclick="switchTab('manual')">手動新增</div>
+      </div>
+
+      <div class="tab-panel active" id="tab-csv">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <label class="btn btn-ghost" style="cursor:pointer;">
+            📂 選擇 CSV 檔案 <input type="file" accept=".csv" id="csvFile" style="display:none" onchange="loadCSV(this)">
+          </label>
+          <button class="btn btn-ghost" onclick="downloadSampleCSV()">⬇ 下載範例 CSV</button>
+        </div>
+        <div style="font-size:0.8rem;color:var(--muted);">格式：<code style="background:var(--bg);padding:2px 6px;border-radius:4px;">題目敘述,選項A,選項B,選項C,選項D,正確答案(A/B/C/D)</code></div>
+      </div>
+
+      <div class="tab-panel" id="tab-manual">
+        <div class="form-group"><label>題目敘述</label><input type="text" id="qDesc" placeholder="例：這是什麼動物？"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div class="form-group"><label>選項 A</label><input type="text" id="qA" placeholder="選項 A"></div>
+          <div class="form-group"><label>選項 B</label><input type="text" id="qB" placeholder="選項 B"></div>
+          <div class="form-group"><label>選項 C</label><input type="text" id="qC" placeholder="選項 C"></div>
+          <div class="form-group"><label>選項 D</label><input type="text" id="qD" placeholder="選項 D"></div>
+        </div>
+        <div class="form-group">
+          <label>正確答案</label>
+          <select id="qAnswer"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
+        </div>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="addQuestion()">➕ 新增題目</button>
+          <button class="btn btn-ghost" onclick="clearQuestions()">🗑 清除所有題目</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 繪圖工具 -->
+    <div class="card">
+      <div class="card-title">🖌 繪圖工具</div>
+      <div class="canvas-tools">
+        <div class="tool-group">
+          <label style="margin:0;font-size:0.8rem;">筆刷</label>
+          <input type="range" id="brushSize" min="1" max="20" value="4" oninput="updateBrush()">
+          <span id="brushVal" style="font-family:'Space Mono';font-size:0.8rem;">4px</span>
+        </div>
+        <div class="tool-group">
+          <input type="color" id="colorPicker" value="#1e1e2e" oninput="updateColor(this.value)">
+        </div>
+        <div class="tool-group" id="swatches">
+          <div class="color-swatch active" style="background:#1e1e2e" onclick="selectColor('#1e1e2e',this)"></div>
+          <div class="color-swatch" style="background:#ef4444" onclick="selectColor('#ef4444',this)"></div>
+          <div class="color-swatch" style="background:#22c55e" onclick="selectColor('#22c55e',this)"></div>
+          <div class="color-swatch" style="background:#3b82f6" onclick="selectColor('#3b82f6',this)"></div>
+          <div class="color-swatch" style="background:#eab308" onclick="selectColor('#eab308',this)"></div>
+          <div class="color-swatch" style="background:#f97316" onclick="selectColor('#f97316',this)"></div>
+          <div class="color-swatch" style="background:#ffffff" onclick="selectColor('#ffffff',this)" style="border:1px solid #444"></div>
+        </div>
+        <button class="btn btn-ghost" onclick="clearCanvas()">🗑 清除</button>
+        <button class="btn btn-ghost" onclick="downloadCanvas()">⬇ 下載</button>
+        <button class="btn btn-primary" onclick="broadcastCanvas()">📡 同步畫面</button>
+      </div>
+      <canvas id="drawCanvas" width="800" height="400"></canvas>
+    </div>
+
+    <!-- AI 圖片 -->
+    <div class="card">
+      <div class="card-title">🤖 AI 圖片增強</div>
+      <div class="ai-grid" id="aiGrid">
+        <div class="ai-style-btn selected" data-style="enhance" onclick="selectAIStyle(this)"><span class="emoji">✨</span>智能增強</div>
+        <div class="ai-style-btn" data-style="cartoon" onclick="selectAIStyle(this)"><span class="emoji">🎨</span>卡通化</div>
+        <div class="ai-style-btn" data-style="oil" onclick="selectAIStyle(this)"><span class="emoji">🖼️</span>油畫風格</div>
+        <div class="ai-style-btn" data-style="watercolor" onclick="selectAIStyle(this)"><span class="emoji">💧</span>水彩效果</div>
+        <div class="ai-style-btn" data-style="sketch" onclick="selectAIStyle(this)"><span class="emoji">✏️</span>鉛筆素描</div>
+        <div class="ai-style-btn" data-style="anime" onclick="selectAIStyle(this)"><span class="emoji">🌸</span>動漫風格</div>
+        <div class="ai-style-btn" data-style="popart" onclick="selectAIStyle(this)"><span class="emoji">🎭</span>普普藝術</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="generateAI()">🤖 生成 AI 圖片</button>
+        <button class="btn btn-ghost" id="btnDownloadAI" onclick="downloadAI()" disabled>⬇ 下載 AI 圖</button>
+      </div>
+      <img id="aiPreview" alt="AI 預覽">
+    </div>
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const socket = io();
+let questions = [];
+let selectedStyle = 'enhance';
+let aiImageData = null;
+let gameStatus = 'waiting';
+
+// Canvas
+const canvas = document.getElementById('drawCanvas');
+const ctx = canvas.getContext('2d');
+ctx.fillStyle = '#ffffff';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+let drawing = false;
+let lastX = 0, lastY = 0;
+let currentColor = '#1e1e2e';
+let brushSize = 4;
+let broadcastTimer = null;
+
+function getPos(e) {
+  const r = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / r.width;
+  const scaleY = canvas.height / r.height;
+  if (e.touches) {
+    return [(e.touches[0].clientX - r.left) * scaleX, (e.touches[0].clientY - r.top) * scaleY];
+  }
+  return [(e.clientX - r.left) * scaleX, (e.clientY - r.top) * scaleY];
+}
+
+canvas.addEventListener('mousedown', e => { drawing = true; [lastX, lastY] = getPos(e); });
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; [lastX, lastY] = getPos(e); }, {passive:false});
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('touchmove', e => { e.preventDefault(); draw(e); }, {passive:false});
+canvas.addEventListener('mouseup', () => { drawing = false; scheduleBroadcast(); });
+canvas.addEventListener('touchend', () => { drawing = false; scheduleBroadcast(); });
+
+function draw(e) {
+  if (!drawing) return;
+  const [x, y] = getPos(e);
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  ctx.lineTo(x, y);
+  ctx.strokeStyle = currentColor;
+  ctx.lineWidth = brushSize;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+  [lastX, lastY] = [x, y];
+}
+
+function scheduleBroadcast() {
+  clearTimeout(broadcastTimer);
+  broadcastTimer = setTimeout(broadcastCanvas, 300);
+}
+
+function broadcastCanvas() {
+  const img = canvas.toDataURL('image/png');
+  socket.emit('drawing_update', { image: img });
+}
+
+function clearCanvas() {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  broadcastCanvas();
+}
+
+function downloadCanvas() {
+  const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = 'drawing.png'; a.click();
+}
+
+function updateBrush() {
+  brushSize = parseInt(document.getElementById('brushSize').value);
+  document.getElementById('brushVal').textContent = brushSize + 'px';
+}
+
+function updateColor(c) { currentColor = c; }
+function selectColor(c, el) {
+  currentColor = c;
+  document.getElementById('colorPicker').value = c;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// AI
+function selectAIStyle(el) {
+  document.querySelectorAll('.ai-style-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedStyle = el.dataset.style;
+}
+
+async function generateAI() {
+  const img = canvas.toDataURL('image/png');
+  showToast('正在生成 AI 圖片...', '');
+  try {
+    const res = await fetch('/api/process_image', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ image: img, style: selectedStyle })
+    });
+    const data = await res.json();
+    if (data.success) {
+      aiImageData = data.image;
+      const preview = document.getElementById('aiPreview');
+      preview.src = data.image; preview.style.display = 'block';
+      document.getElementById('btnDownloadAI').disabled = false;
+      showToast('AI 圖片生成完成！', 'success');
+    } else { showToast(data.error || '生成失敗', 'error'); }
+  } catch(e) { showToast('網路錯誤', 'error'); }
+}
+
+function downloadAI() {
+  if (!aiImageData) return;
+  const a = document.createElement('a'); a.href = aiImageData; a.download = 'ai_image.png'; a.click();
+}
+
+// Questions
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['csv','manual'][i] === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function loadCSV(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const lines = e.target.result.split('\n').filter(l => l.trim());
+    const newQs = [];
+    for (const line of lines) {
+      const parts = line.split(',').map(s => s.trim());
+      if (parts.length < 6) continue;
+      newQs.push({ description: parts[0], options: [parts[1],parts[2],parts[3],parts[4]], correct: parts[5].toUpperCase() });
+    }
+    questions = [...questions, ...newQs].slice(0, 50);
+    uploadQuestions();
+    renderQuestions();
+    showToast(`已載入 ${newQs.length} 題`, 'success');
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function downloadSampleCSV() {
+  const csv = '這隻動物有長鼻子,大象,河馬,犀牛,長頸鹿,A\n這種水果是黃色的,蘋果,香蕉,西瓜,葡萄,B\n';
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'sample.csv'; a.click();
+}
+
+function addQuestion() {
+  const desc = document.getElementById('qDesc').value.trim();
+  const A = document.getElementById('qA').value.trim();
+  const B = document.getElementById('qB').value.trim();
+  const C = document.getElementById('qC').value.trim();
+  const D = document.getElementById('qD').value.trim();
+  const ans = document.getElementById('qAnswer').value;
+  if (!desc || !A || !B || !C || !D) { showToast('請填寫所有欄位', 'error'); return; }
+  if (questions.length >= 50) { showToast('題目已達上限 50 題', 'error'); return; }
+  questions.push({ description: desc, options: [A,B,C,D], correct: ans });
+  uploadQuestions(); renderQuestions();
+  ['qDesc','qA','qB','qC','qD'].forEach(id => document.getElementById(id).value = '');
+  showToast('題目已新增', 'success');
+}
+
+function clearQuestions() {
+  if (!confirm('確定要清除所有題目？')) return;
+  questions = []; uploadQuestions(); renderQuestions();
+}
+
+async function uploadQuestions() {
+  await fetch('/api/upload_questions', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ questions })
+  });
+}
+
+function renderQuestions() {
+  const list = document.getElementById('questionList');
+  const count = document.getElementById('qCount');
+  count.textContent = questions.length;
+  if (!questions.length) { list.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:12px;">尚無題目</div>'; return; }
+  list.innerHTML = questions.map((q,i) => `
+    <div class="q-item">
+      <div class="q-desc">${i+1}. ${q.description}</div>
+      <div class="q-options">A:${q.options[0]} B:${q.options[1]} C:${q.options[2]} D:${q.options[3]} ✓${q.correct}</div>
+    </div>
+  `).join('');
+}
+
+// Game controls
+function startGame() {
+  if (!questions.length) { showToast('請先設定題目', 'error'); return; }
+  socket.emit('admin_start_game');
+}
+function openAnswer() { socket.emit('admin_open_answer'); }
+function showResult() { socket.emit('admin_show_result'); }
+function nextQuestion() {
+  // ✅ 清空畫布後才送出下一題
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  broadcastCanvas();
+  aiImageData = null;
+  document.getElementById('aiPreview').style.display = 'none';
+  document.getElementById('btnDownloadAI').disabled = true;
+  socket.emit('admin_next_question');
+}
+
+// Socket events
+socket.on('connect', () => {
+  document.getElementById('connDot').className = 'dot green';
+  document.getElementById('connText').textContent = '已連線';
+});
+socket.on('disconnect', () => {
+  document.getElementById('connDot').className = 'dot';
+  document.getElementById('connText').textContent = '已斷線';
+});
+
+socket.on('participant_joined', data => {
+  renderParticipants(data.participants, data.count);
+});
+socket.on('participant_left', data => {
+  renderParticipants(data.participants, data.participants.length);
+});
+socket.on('game_state', data => {
+  gameStatus = data.status;
+  updateStatus(data.status);
+  renderParticipants(data.participants, data.participants.length);
+});
+socket.on('show_question', data => {
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('qProgress').textContent = `${data.index+1} / ${data.total}`;
+  document.getElementById('progressFill').style.width = `${((data.index+1)/data.total)*100}%`;
+  document.getElementById('btnOpen').disabled = false;
+  document.getElementById('btnResult').disabled = true;
+  document.getElementById('btnNext').disabled = true;
+  updateStatus('question');
+});
+socket.on('start_answering', () => {
+  document.getElementById('answerProgress').style.display = 'block';
+  document.getElementById('answerProgress').textContent = '答題中: 0 / ' + Object.keys({}).length;
+  document.getElementById('btnOpen').disabled = true;
+  document.getElementById('btnResult').disabled = false;
+  updateStatus('answering');
+});
+socket.on('answer_progress', data => {
+  document.getElementById('answerProgress').textContent = `已答題: ${data.answered} / ${data.total}`;
+});
+socket.on('show_result', () => {
+  document.getElementById('btnNext').disabled = false;
+  document.getElementById('btnResult').disabled = true;
+  document.getElementById('btnOpen').disabled = true;
+  updateStatus('result');
+});
+socket.on('game_finished', () => updateStatus('finished'));
+
+// 下一題時清空畫布
+socket.on('clear_canvas', () => {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  aiImageData = null;
+  document.getElementById('aiPreview').style.display = 'none';
+  document.getElementById('btnDownloadAI').disabled = true;
+  document.getElementById('answerProgress').style.display = 'none';
+});
+
+function renderParticipants(list, count) {
+  document.getElementById('participantCount').textContent = count;
+  const el = document.getElementById('participantList');
+  if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:16px;">尚無參賽者加入</div>'; return; }
+  const sorted = [...list].sort((a,b) => b.score - a.score);
+  el.innerHTML = sorted.map((p,i) => `
+    <div class="participant-item">
+      <span>${['🥇','🥈','🥉'][i] || ''} ${p.name}</span>
+      <span class="score">${p.score}</span>
+    </div>
+  `).join('');
+}
+
+const statusMap = {
+  waiting:'等待中', started:'開始中', question:'展示題目', drawing:'繪圖中', answering:'答題中', result:'結果公布', finished:'遊戲結束'
+};
+function updateStatus(s) {
+  document.getElementById('gameStatusText').textContent = statusMap[s] || s;
+  document.getElementById('btnStart').disabled = s !== 'waiting';
+}
+
+// Toast
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'show ' + type;
+  setTimeout(() => t.className = '', 2800);
+}
+</script>
+</body>
+</html>
