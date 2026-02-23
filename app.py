@@ -147,8 +147,6 @@ STYLE_PROMPTS = {
 }
 NEGATIVE_PROMPT = 'blurry, ugly, distorted, deformed, low quality, watermark, text'
 
-# DEFAULT_HF_TOKEN = ''
-
 def diffusion_generate(image_data_url, style, hf_token=None):
     """用 Stable Horde 免費分散式 API 生成圖片"""
     import time
@@ -278,30 +276,6 @@ def api_process_image():
         return jsonify({'error': '缺少圖片資料'}), 400
     try:
         result = process_image(image_data, style)
-        game_state['ai_image'] = result
-        game_state['ai_style'] = style
-        q_idx = game_state['current_question']
-        q = game_state['questions'][q_idx] if game_state['questions'] else {}
-        socketio.emit('ai_image_generated', {
-            'image': result,
-            'style': style,
-            'description': q.get('description', ''),
-        })
-        return jsonify({'success': True, 'image': result, 'style': style})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/diffusion', methods=['POST'])
-def api_diffusion():
-    """用 Stable Diffusion 把輪廓轉成細緻圖（自動使用選取風格）"""
-    data = request.json
-    image_data = data.get('image')
-    style = data.get('style', 'realistic')
-    # hf_token = data.get('hf_token') or os.environ.get('HF_TOKEN', DEFAULT_HF_TOKEN)
-    if not image_data:
-        return jsonify({'error': '缺少圖片資料'}), 400
-    try:
-        result = diffusion_generate(image_data, style, hf_token)
         game_state['ai_image'] = result
         game_state['ai_style'] = style
         q_idx = game_state['current_question']
