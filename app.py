@@ -147,7 +147,7 @@ STYLE_PROMPTS = {
 }
 NEGATIVE_PROMPT = 'blurry, ugly, distorted, deformed, low quality, watermark, text'
 
-DEFAULT_HF_TOKEN = 'REMOVED'
+# DEFAULT_HF_TOKEN = ''
 
 def diffusion_generate(image_data_url, style, hf_token=None):
     """用 Stable Horde 免費分散式 API 生成圖片"""
@@ -297,7 +297,7 @@ def api_diffusion():
     data = request.json
     image_data = data.get('image')
     style = data.get('style', 'realistic')
-    hf_token = data.get('hf_token') or os.environ.get('HF_TOKEN', DEFAULT_HF_TOKEN)
+    # hf_token = data.get('hf_token') or os.environ.get('HF_TOKEN', DEFAULT_HF_TOKEN)
     if not image_data:
         return jsonify({'error': '缺少圖片資料'}), 400
     try:
