@@ -206,7 +206,7 @@ socket.on('participant_joined', data => {
   renderParticipants(data.participants, data.count);
 });
 socket.on('participant_left', data => {
-  renderParticipants(data.participants, data.participants.length);
+  renderParticipants(data.participants, data.count);
 });
 
 socket.on('show_question', data => {
@@ -242,7 +242,7 @@ socket.on('clear_canvas', () => {
 });
 
 socket.on('ai_image_generated', data => {
-  const styleNames = {enhance:'✨智能增強',cartoon:'🎨卡通化',oil:'🖼️油畫',watercolor:'💧水彩',sketch:'✏️素描',anime:'🌸動漫',popart:'🎭普普'};
+  const styleNames = {realistic:'📸寫實',ghibli:'🏡吉卜力',comic:'💥漫畫',watercolor:'💧水彩',oil:'🖼️油畫',scifi:'🚀科幻'};
   document.getElementById('showCanvas').src = data.image;
   document.getElementById('drawStatus').textContent = `🤖 AI 圖片已完成 — ${styleNames[data.style] || data.style}`;
   if (data.description) document.getElementById('drawQBanner').textContent = data.description;
@@ -258,7 +258,7 @@ socket.on('start_answering', data => {
   if (qLabel) qLabel.textContent = data.description || (currentQuestion && currentQuestion.description) || '';
   const badge = document.getElementById('aiBadge');
   if (data.ai_style) {
-    const styleNames = {enhance:'✨智能增強',cartoon:'🎨卡通化',oil:'🖼️油畫',watercolor:'💧水彩',sketch:'✏️素描',anime:'🌸動漫',popart:'🎭普普'};
+    const styleNames = {realistic:'📸寫實',ghibli:'🏡吉卜力',comic:'💥漫畫',watercolor:'💧水彩',oil:'🖼️油畫',scifi:'🚀科幻'};
     badge.textContent = styleNames[data.ai_style] || data.ai_style;
     badge.style.display = 'block';
   } else { badge.style.display = 'none'; }
@@ -304,6 +304,27 @@ function startTimer(seconds) {
   tick();
   timerInterval = setInterval(tick, 1000);
 }
+
+socket.on('switch_image', data => {
+  const img = document.getElementById('ansImage');
+  if (img) img.src = data.image || '';
+  const badge = document.getElementById('aiBadge');
+  if (badge) {
+    if (data.mode === 'ai' && data.ai_style) {
+      const styleNames = {realistic:'📸寫實',ghibli:'🏡吉卜力',comic:'💥漫畫',watercolor:'💧水彩',oil:'🖼️油畫',scifi:'🚀科幻'};
+      badge.textContent = styleNames[data.ai_style] || data.ai_style;
+      badge.style.display = 'block';
+      badge.style.animation = 'none';
+      // restart animation
+      requestAnimationFrame(() => { badge.style.animation = 'fadeOut 5s forwards'; });
+    } else {
+      badge.textContent = '🖌 原始手繪';
+      badge.style.display = 'block';
+      badge.style.animation = 'none';
+      requestAnimationFrame(() => { badge.style.animation = 'fadeOut 5s forwards'; });
+    }
+  }
+});
 
 socket.on('show_result', data => {
   clearInterval(timerInterval);
@@ -351,7 +372,10 @@ socket.on('game_finished', data => {
 
 function renderParticipants(list, count) {
   document.getElementById('wCount').textContent = `${count} / 20 位參賽者`;
-  document.getElementById('wParticipants').innerHTML = list.map(p => `<div class="w-participant">${p.name}</div>`).join('');
+  const sorted = [...list].sort((a, b) => parseInt(a.name) - parseInt(b.name));
+  document.getElementById('wParticipants').innerHTML = sorted.map(p =>
+    `<div class="w-participant">${p.name}</div>`
+  ).join('');
 }
 
 // Simple firework effect

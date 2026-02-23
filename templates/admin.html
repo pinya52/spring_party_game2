@@ -195,6 +195,13 @@
         <button class="btn btn-primary" id="btnResult" onclick="showResult()" disabled>📊 公布結果</button>
         <button class="btn btn-ghost" id="btnNext" onclick="nextQuestion()" disabled>⏭ 下一題</button>
       </div>
+      <div id="switchImageRow" style="display:none;margin-bottom:12px;">
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;">答題畫面顯示：</div>
+        <div class="btn-row">
+          <button class="btn btn-primary" id="btnShowAI" onclick="switchImage('ai')" style="flex:1;">🤖 AI 圖片</button>
+          <button class="btn btn-ghost" id="btnShowCanvas" onclick="switchImage('canvas')" style="flex:1;">🖌 原始畫布</button>
+        </div>
+      </div>
       <div id="progressWrap" style="display:none">
         <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.82rem;color:var(--muted);">
           <span>題目進度</span><span id="qProgress">0 / 0</span>
@@ -279,7 +286,8 @@
           <div class="color-swatch" style="background:#f97316" onclick="selectColor('#f97316',this)"></div>
           <div class="color-swatch" style="background:#ffffff" onclick="selectColor('#ffffff',this)" style="border:1px solid #444"></div>
         </div>
-        <button class="btn btn-ghost" onclick="clearCanvas()">🗑 清除</button>
+        <button class="btn btn-ghost" onclick="undoStroke()">↩ 復原</button>
+        <button class="btn btn-ghost" onclick="clearCanvas()">🗑 全部清除</button>
         <button class="btn btn-ghost" onclick="downloadCanvas()">⬇ 下載</button>
         <button class="btn btn-primary" onclick="broadcastCanvas()">📡 同步畫面</button>
       </div>
@@ -288,20 +296,41 @@
 
     <!-- AI 圖片 -->
     <div class="card">
-      <div class="card-title">🤖 AI 圖片增強</div>
+      <div class="card-title">🎨 AI 風格套用</div>
       <div class="ai-grid" id="aiGrid">
-        <div class="ai-style-btn selected" data-style="enhance" onclick="selectAIStyle(this)"><span class="emoji">✨</span>智能增強</div>
-        <div class="ai-style-btn" data-style="cartoon" onclick="selectAIStyle(this)"><span class="emoji">🎨</span>卡通化</div>
-        <div class="ai-style-btn" data-style="oil" onclick="selectAIStyle(this)"><span class="emoji">🖼️</span>油畫風格</div>
-        <div class="ai-style-btn" data-style="watercolor" onclick="selectAIStyle(this)"><span class="emoji">💧</span>水彩效果</div>
-        <div class="ai-style-btn" data-style="sketch" onclick="selectAIStyle(this)"><span class="emoji">✏️</span>鉛筆素描</div>
-        <div class="ai-style-btn" data-style="anime" onclick="selectAIStyle(this)"><span class="emoji">🌸</span>動漫風格</div>
-        <div class="ai-style-btn" data-style="popart" onclick="selectAIStyle(this)"><span class="emoji">🎭</span>普普藝術</div>
+        <div class="ai-style-btn selected" data-style="realistic" onclick="selectAIStyle(this)">
+          <span class="emoji">📸</span>寫實
+        </div>
+        <div class="ai-style-btn" data-style="ghibli" onclick="selectAIStyle(this)">
+          <span class="emoji">🏡</span>吉卜力
+        </div>
+        <div class="ai-style-btn" data-style="comic" onclick="selectAIStyle(this)">
+          <span class="emoji">💥</span>漫畫
+        </div>
+        <div class="ai-style-btn" data-style="watercolor" onclick="selectAIStyle(this)">
+          <span class="emoji">💧</span>水彩
+        </div>
+        <div class="ai-style-btn" data-style="oil" onclick="selectAIStyle(this)">
+          <span class="emoji">🖼️</span>油畫
+        </div>
+        <div class="ai-style-btn" data-style="scifi" onclick="selectAIStyle(this)">
+          <span class="emoji">🚀</span>科幻
+        </div>
       </div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="generateAI()">🤖 生成 AI 圖片</button>
-        <button class="btn btn-ghost" id="btnDownloadAI" onclick="downloadAI()" disabled>⬇ 下載 AI 圖</button>
+        <button class="btn btn-primary" onclick="generateAI()">🎨 套用風格</button>
+        <button class="btn btn-ghost" id="btnDownloadAI" onclick="downloadAI()" disabled>⬇ 下載圖片</button>
       </div>
+
+      <!-- Stable Diffusion 區塊 -->
+      <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
+        <div class="card-title">🤖 AI 生成圖片（Stable Horde）</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;">
+          ✅ 使用 <strong style="color:var(--accent2)">Stable Horde</strong> 免費分散式生成，不需要 Token。約 30-60 秒完成。
+        </div>
+        <button class="btn btn-primary" onclick="generateDiffusion()" id="btnDiffusion">✨ AI 生成圖片</button>
+      </div>
+
       <img id="aiPreview" alt="AI 預覽">
     </div>
   </main>
@@ -312,7 +341,7 @@
 <script>
 const socket = io();
 let questions = [];
-let selectedStyle = 'enhance';
+let selectedStyle = 'realistic';
 let aiImageData = null;
 let gameStatus = 'waiting';
 
@@ -326,6 +355,28 @@ let lastX = 0, lastY = 0;
 let currentColor = '#1e1e2e';
 let brushSize = 4;
 let broadcastTimer = null;
+let strokeHistory = [];  // 每筆結束後存快照
+
+function saveSnapshot() {
+  strokeHistory.push(canvas.toDataURL());
+  if (strokeHistory.length > 30) strokeHistory.shift(); // 最多保留30步
+}
+
+function undoStroke() {
+  if (strokeHistory.length === 0) { showToast('沒有可復原的步驟', ''); return; }
+  strokeHistory.pop(); // 移除目前狀態
+  const prev = strokeHistory.length > 0 ? strokeHistory[strokeHistory.length - 1] : null;
+  if (prev) {
+    const img2 = new Image();
+    img2.onload = () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img2,0,0); scheduleBroadcast(); };
+    img2.src = prev;
+  } else {
+    // 回到空白
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    scheduleBroadcast();
+  }
+}
 
 function getPos(e) {
   const r = canvas.getBoundingClientRect();
@@ -341,8 +392,8 @@ canvas.addEventListener('mousedown', e => { drawing = true; [lastX, lastY] = get
 canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; [lastX, lastY] = getPos(e); }, {passive:false});
 canvas.addEventListener('mousemove', draw);
 canvas.addEventListener('touchmove', e => { e.preventDefault(); draw(e); }, {passive:false});
-canvas.addEventListener('mouseup', () => { drawing = false; scheduleBroadcast(); });
-canvas.addEventListener('touchend', () => { drawing = false; scheduleBroadcast(); });
+canvas.addEventListener('mouseup', () => { drawing = false; saveSnapshot(); scheduleBroadcast(); });
+canvas.addEventListener('touchend', () => { drawing = false; saveSnapshot(); scheduleBroadcast(); });
 
 function draw(e) {
   if (!drawing) return;
@@ -413,9 +464,40 @@ async function generateAI() {
       const preview = document.getElementById('aiPreview');
       preview.src = data.image; preview.style.display = 'block';
       document.getElementById('btnDownloadAI').disabled = false;
+      document.getElementById('btnOpen').disabled = false;
       showToast('AI 圖片生成完成！', 'success');
+      _showSwitchRow('ai');
     } else { showToast(data.error || '生成失敗', 'error'); }
   } catch(e) { showToast('網路錯誤', 'error'); }
+}
+
+async function generateDiffusion() {
+  const img = canvas.toDataURL('image/png');
+  const btn = document.getElementById('btnDiffusion');
+  btn.disabled = true;
+  btn.textContent = '⏳ 生成中（約30-60秒）...';
+  showToast('正在生成 AI 圖片（風格：' + selectedStyle + '）...', '');
+  try {
+    const res = await fetch('/api/diffusion', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ image: img, style: selectedStyle })
+    });
+    const data = await res.json();
+    if (data.success) {
+      aiImageData = data.image;
+      const preview = document.getElementById('aiPreview');
+      preview.src = data.image; preview.style.display = 'block';
+      document.getElementById('btnDownloadAI').disabled = false;
+      document.getElementById('btnOpen').disabled = false;
+      showToast('Stable Diffusion 生成完成！', 'success');
+      _showSwitchRow('ai');
+    } else { showToast(data.error || '生成失敗', 'error'); }
+  } catch(e) { showToast('網路錯誤：' + e.message, 'error'); }
+  finally {
+    btn.disabled = false;
+    btn.textContent = '✨ AI 生成圖片';
+  }
 }
 
 function downloadAI() {
@@ -502,6 +584,18 @@ function startGame() {
   socket.emit('admin_start_game');
 }
 function openAnswer() { socket.emit('admin_open_answer'); }
+function _showSwitchRow(defaultMode) {
+  document.getElementById('switchImageRow').style.display = 'block';
+  document.getElementById('btnShowAI').className = 'btn ' + (defaultMode === 'ai' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('btnShowCanvas').className = 'btn ' + (defaultMode === 'canvas' ? 'btn-primary' : 'btn-ghost');
+}
+
+function switchImage(mode) {
+  socket.emit('admin_switch_image', { mode });
+  document.getElementById('btnShowAI').className = 'btn ' + (mode === 'ai' ? 'btn-primary' : 'btn-ghost');
+  document.getElementById('btnShowCanvas').className = 'btn ' + (mode === 'canvas' ? 'btn-primary' : 'btn-ghost');
+  showToast(mode === 'ai' ? '切換為 AI 圖片' : '切換為原始畫布', 'success');
+}
 function showResult() { socket.emit('admin_show_result'); }
 function nextQuestion() {
   // ✅ 清空畫布後才送出下一題
@@ -543,12 +637,16 @@ socket.on('show_question', data => {
   document.getElementById('btnResult').disabled = true;
   document.getElementById('btnNext').disabled = true;
   updateStatus('question');
+  // 遊戲開始就顯示切換按鈕，預設顯示畫布
+  _showSwitchRow('canvas');
 });
 socket.on('start_answering', () => {
   document.getElementById('answerProgress').style.display = 'block';
   document.getElementById('answerProgress').textContent = '答題中: 0 / ' + Object.keys({}).length;
   document.getElementById('btnOpen').disabled = true;
   document.getElementById('btnResult').disabled = false;
+  // 顯示切換按鈕，預設 AI 圖片為 active（若無 AI 圖則預設畫布）
+  _showSwitchRow(aiImageData ? 'ai' : 'canvas');
   updateStatus('answering');
 });
 socket.on('answer_progress', data => {
@@ -570,19 +668,33 @@ socket.on('clear_canvas', () => {
   document.getElementById('aiPreview').style.display = 'none';
   document.getElementById('btnDownloadAI').disabled = true;
   document.getElementById('answerProgress').style.display = 'none';
+  // 重置為畫布模式，但保持按鈕顯示
+  _showSwitchRow('canvas');
 });
 
 function renderParticipants(list, count) {
   document.getElementById('participantCount').textContent = count;
   const el = document.getElementById('participantList');
   if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:16px;">尚無參賽者加入</div>'; return; }
-  const sorted = [...list].sort((a,b) => b.score - a.score);
+  const sorted = [...list].sort((a,b) => {
+    // 依桌號數字排序
+    const na = parseInt(a.name); const nb = parseInt(b.name);
+    return na - nb;
+  });
   el.innerHTML = sorted.map((p,i) => `
     <div class="participant-item">
-      <span>${['🥇','🥈','🥉'][i] || ''} ${p.name}</span>
-      <span class="score">${p.score}</span>
+      <span style="font-weight:700;">${p.name}</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="score">${p.score}</span>
+        ${gameStatus === 'waiting' ? `<button onclick="kickParticipant('${p.name}')" style="background:rgba(239,68,68,0.2);border:1px solid var(--red);color:var(--red);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem;">移除</button>` : ''}
+      </div>
     </div>
   `).join('');
+}
+
+function kickParticipant(name) {
+  if (!confirm(`確定要移除「${name}」？`)) return;
+  socket.emit('admin_kick', { name });
 }
 
 const statusMap = {

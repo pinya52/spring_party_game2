@@ -8,3 +8,4 @@ python-engineio==4.8.0
 python-socketio==5.10.0
 gunicorn==21.2.0
 eventlet==0.35.1
+requests==2.31.0

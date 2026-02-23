@@ -153,8 +153,13 @@
   <div class="logo-sub">多人線上猜圖遊戲</div>
   <div class="conn-indicator"><div class="dot" id="connDot"></div><span id="connText">連線中...</span></div>
   <div class="login-card">
-    <div class="login-label">輸入您的組別名稱</div>
-    <input type="text" id="nameInput" placeholder="組別名稱（最多 20 字）" maxlength="20" autocomplete="off">
+    <div class="login-label">輸入您的桌號（01–19）</div>
+    <input type="text" id="nameInput" placeholder="例如：05" maxlength="2" autocomplete="off"
+      inputmode="numeric" pattern="[0-9]*"
+      style="font-size:2rem;text-align:center;letter-spacing:0.3em;font-family:'Space Mono',monospace;">
+    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:14px;text-align:center;">
+      輸入後名稱將顯示為「05桌」
+    </div>
     <button class="btn-join" onclick="joinGame()">加入遊戲 →</button>
     <div class="error-msg" id="errorMsg"></div>
   </div>
@@ -168,6 +173,11 @@
   </div>
   <div class="welcome-name" id="welcomeName"></div>
   <div class="wait-text">成功加入！<br>等待管理員開始遊戲...</div>
+  <button id="btnRename" onclick="requestRename()"
+    style="margin-top:24px;background:transparent;border:1px solid var(--border);color:var(--muted);
+    border-radius:10px;padding:10px 24px;font-size:0.88rem;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">
+    ✏️ 重新輸入桌號
+  </button>
 </div>
 
 <!-- QUESTION -->
@@ -255,11 +265,42 @@ socket.on('disconnect', () => {
 
 // Login
 function joinGame() {
-  const name = document.getElementById('nameInput').value.trim();
-  if (!name) { setError('請輸入組別名稱'); return; }
-  socket.emit('join_game', { name });
+  const raw = document.getElementById('nameInput').value.trim();
+  if (!raw) { setError('請輸入桌號'); return; }
+  // 前端預驗證
+  if (!/^(0[1-9]|1[0-9])$/.test(raw)) {
+    setError('請輸入 01–19 之間的兩位數字（例如：05）'); return;
+  }
+  setError('');
+  socket.emit('join_game', { number: raw });
 }
 document.getElementById('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
+// 自動補零：輸入單個數字時自動補前導零
+document.getElementById('nameInput').addEventListener('input', e => {
+  let v = e.target.value.replace(/[^0-9]/g, '').slice(0, 2);
+  e.target.value = v;
+});
+
+function requestRename() {
+  socket.emit('request_rename');
+}
+
+socket.on('rename_ok', () => {
+  myName = '';
+  document.getElementById('nameInput').value = '';
+  setError('');
+  showScreen('screenLogin');
+});
+socket.on('rename_error', data => {
+  showToast(data.message);
+});
+socket.on('kicked', () => {
+  myName = '';
+  document.getElementById('nameInput').value = '';
+  setError('');
+  showToast('您已被管理員移除，請重新輸入桌號');
+  showScreen('screenLogin');
+});
 
 socket.on('join_error', data => setError(data.message));
 socket.on('join_success', data => {
