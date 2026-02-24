@@ -149,45 +149,100 @@ STYLE_PROMPTS = {
 NEGATIVE_PROMPT = 'blurry, ugly, distorted, deformed, low quality, watermark, text'
 
 def diffusion_generate(image_data_url, style, hf_token=None):
-    """用 Gemini API 把草圖轉成精緻圖"""
-    # 1. 取得 API Key (會自動從 Railway 的 Variables 讀取)
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise Exception("伺服器未設定 GEMINI_API_KEY 環境變數")
+    """用 AI Horde (Stable Diffusion) 把草圖轉成精緻圖，不會有 429 錯誤"""
+    import time
+    import requests as http_requests
 
-    # 2. 解析前端傳來的 Base64 草圖圖片
+    # 1. 解析前端傳來的 Base64 草圖圖片
     header, b64 = image_data_url.split(',', 1)
     raw = base64.b64decode(b64)
     img = Image.open(io.BytesIO(raw)).convert('RGB')
     
-    # 3. 準備風格提示詞 (Prompt)
-    # 這裡的提示詞專為 Gemini 調整，強調「保留原始輪廓」
+    # 將原始圖片存入記憶體準備發送
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    source_image_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
+
     STYLE_PROMPTS = {
-        'realistic': 'Transform this sketch into a high quality, photorealistic image. Keep the core subject and outline exactly the same, but add realistic textures, lighting, and colorful details.',
-        'ghibli': 'Transform this sketch into a Studio Ghibli anime style masterpiece. Keep the original outline but add soft lighting, vibrant colors, and beautiful anime shading.',
-        'watercolor': 'Transform this sketch into a beautiful watercolor painting. Use soft, transparent washes of color while strictly preserving the original drawing.',
-        'comic': 'Transform this sketch into a colorful manga comic style. Enhance it with bold lines and dynamic comic book coloring, but keep the original shape.',
-        'oil': 'Transform this sketch into a classic oil painting with thick brushstrokes, rich vivid colors, maintaining the original subject.',
-        'scifi': 'Transform this sketch into sci-fi concept art. Add neon colors, futuristic glowing edges, and high contrast while keeping the drawn subject.'
+        'realistic':  'high quality photo, colorful, detailed, realistic style',
+        'ghibli':     'studio ghibli anime style, colorful, soft lighting, high quality',
+        'watercolor': 'watercolor painting, soft colors, transparent wash, high quality',
+        'comic':      'manga comic style, bold lines, colorful, high quality',
+        'oil':        'oil painting, thick brushstrokes, vivid colors, high quality',
+        'scifi':      'sci-fi concept art, neon colors, futuristic, high quality',
     }
     prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS['realistic'])
+    NEGATIVE_PROMPT = 'blurry, ugly, distorted, deformed, low quality, watermark, text'
 
-    # 4. 呼叫 Gemini 2.5 Flash Image 模型
-    client = genai.Client(api_key=api_key)
-    response = client.models.generate_content(
-        model="gemini-2.5-flash-image",
-        contents=[img, prompt] # 將圖片放在前面，文字提示放在後面
-    )
+    # 2. 向 AI Horde 提交任務 (拿到號碼牌)
+    submit_url = "https://aihorde.net/api/v2/generate/async"
+    req_headers = {
+        "apikey": "0000000000", # 使用預設匿名免費帳號
+        "Content-Type": "application/json",
+        "Client-Agent": "pictureguess:1.0",
+    }
+    
+    payload = {
+        "prompt": prompt + " ### " + NEGATIVE_PROMPT,
+        "params": {
+            "width": 512,
+            "height": 512,
+            "steps": 20,
+            "sampler_name": "k_euler_a",
+            "n": 1,
+        },
+        "nsfw": False,
+        "censor_nsfw": True,
+        "models": ["stable_diffusion"],
+        "source_image": source_image_base64, # 將草圖作為墊圖
+        "source_processing": "img2img",
+    }
+    
+    resp = http_requests.post(submit_url, headers=req_headers, json=payload, timeout=30)
+    if resp.status_code != 202:
+        raise Exception(f"提交給 AI Horde 失敗，請稍後再試。")
+    
+    job_id = resp.json().get("id")
 
-    # 5. 取出生成的圖片並回傳 Base64 給前端
-    for part in response.parts:
-        if part.inline_data is not None:
-            generated_img = part.as_image()
-            out_buf = io.BytesIO()
-            generated_img.save(out_buf, format='PNG')
-            return "data:image/png;base64," + base64.b64encode(out_buf.getvalue()).decode()
+    # 3. 進入排隊輪詢機制 (每 3 秒問一次畫好了沒，最多等 60 秒)
+    check_url  = f"https://aihorde.net/api/v2/generate/check/{job_id}"
+    status_url = f"https://aihorde.net/api/v2/generate/status/{job_id}"
+    
+    for i in range(20):
+        time.sleep(3)
+        try:
+            check = http_requests.get(check_url, headers=req_headers, timeout=10).json()
+        except Exception:
+            continue
             
-    raise Exception("Gemini 尚未成功回傳圖片，請稍後再試。")
+        if check.get("faulted"):
+            raise Exception("AI 繪圖任務失敗，請重試。")
+        if check.get("done"):
+            break
+    else:
+        raise Exception("排隊人數較多，生成逾時，請再試一次。")
+
+    # 4. 取得完成的圖片
+    result = http_requests.get(status_url, headers=req_headers, timeout=30).json()
+    generations = result.get("generations", [])
+    if not generations:
+        raise Exception("未取得生成結果。")
+
+    img_data = generations[0].get("img", "")
+    
+    if img_data.startswith("http"):
+        img_resp = http_requests.get(img_data, timeout=30)
+        raw_result = img_resp.content
+    else:
+        if "," in img_data:
+            img_data = img_data.split(",", 1)[1]
+        raw_result = base64.b64decode(img_data)
+
+    result_img = Image.open(io.BytesIO(raw_result)).convert('RGB')
+    out_buf = io.BytesIO()
+    result_img.save(out_buf, format='PNG')
+    
+    return "data:image/png;base64," + base64.b64encode(out_buf.getvalue()).decode()
 
 @app.route('/')
 def index(): return render_template('admin.html')
