@@ -8,6 +8,7 @@ from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 from PIL import Image, ImageFilter, ImageEnhance, ImageOps
 import numpy as np
+from google import genai
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'pictureguess-secret-2024')
