@@ -11,3 +11,5 @@ eventlet==0.35.1
 requests==2.31.0
 gevent
 gevent-websocket
+google-genai
+pillow
