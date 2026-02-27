@@ -401,10 +401,19 @@ def on_submit_answer(data):
     q = _current_question()
     correct = (data.get('answer') == q['correct'])
     
+    # 計算分數邏輯
     base = 100 if correct else 0
     time_bonus = max(0, int((20 - data.get('time_taken', 20)) * 5)) if correct else 0
-    p['streak'] = p['streak'] + 1 if correct else 0
-    streak_bonus = p['streak'] * 10 if correct else 0
+    
+    # 💡 修正連續獎勵邏輯
+    if correct:
+        # 答對了，連續次數 +1，並給予獎勵
+        p['streak'] = p.get('streak', 0) + 1
+        streak_bonus = p['streak'] * 10
+    else:
+        # 答錯了，連續次數立即歸零
+        p['streak'] = 0
+        streak_bonus = 0
     
     total_gain = base + time_bonus + streak_bonus
     p['score'] += total_gain

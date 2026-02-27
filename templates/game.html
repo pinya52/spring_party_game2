@@ -398,7 +398,14 @@ function startAnswerTimer(remaining, total) {
     else if (currentRem <= 10) { fill.style.background = '#f97316'; num.className = 'answer-timer-num orange'; } 
     else { fill.style.background = '#3b82f6'; num.className = 'answer-timer-num'; }
     
-    if (currentRem <= 0) { clearInterval(timerInterval); return; }
+    if (currentRem <= 0) { 
+        clearInterval(timerInterval);
+        // 💡 如果時間到且還沒回答，雖然沒得分，但要跳轉到結果頁面
+        if (!answeredThisRound) {
+            showScreen('screenWaitResult'); 
+        }
+        return; 
+    }
     currentRem--;
   }
   tick(); 
