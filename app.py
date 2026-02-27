@@ -180,16 +180,16 @@ def api_get_game_state():
     # 💡計算剩餘時間
     rem = 0
     if game_state['status'] == 'answering':
-        rem = max(0, int(game_state['answer_duration'] - (time.time() - game_state.get('answer_start_time', time.time()))))
+        rem = max(0, int(game_state.get('answer_duration', 20) - (time.time() - game_state.get('answer_start_time', time.time()))))
 
     return jsonify({
         'phase': game_state['status'],
-        'imageData': game_state.get('canvas_data') or game_state.get('ai_image'),
+        # 💡將原本的 'imageData': ... 這一行整行刪除！(因為手機端根本不需要圖片，這就是造成卡頓的元兇)
         'players': _get_full_ranking(),
         'question': q_data,
-        'remaining_time': rem,                                 # 新增
-        'duration': game_state.get('answer_duration', 20)      # 新增
-    })
+        'remaining_time': rem,
+        'duration': game_state.get('answer_duration', 20)
+    })  
 
 @app.route('/api/upload_questions', methods=['POST'])
 def upload_questions():
@@ -341,13 +341,16 @@ def on_admin_open_answer():
     for v in game_state['participants'].values(): v['answered'] = False
     q = _current_question()
     
-    # 💡修改：移除 image、canvas_image、ai_image 的巨型 Base64 傳輸，告別卡頓！
+    # 💡恢復傳送圖片資料，因為只會廣播一次，不會造成伺服器負擔
     socketio.emit('start_answering', {
+        'image': game_state.get('ai_image') or game_state.get('canvas_data'),
+        'canvas_image': game_state.get('canvas_data'),
+        'ai_image': game_state.get('ai_image'),
         'has_ai': bool(game_state.get('ai_image') and game_state.get('canvas_data')),
         'ai_style': game_state.get('ai_style'),
         'options': q['options'],
         'description': q['description'],
-        'duration': 20,
+        'duration': game_state.get('answer_duration', 20),
     })
 
 @socketio.on('admin_switch_image')

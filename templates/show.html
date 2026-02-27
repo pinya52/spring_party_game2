@@ -243,21 +243,20 @@ socket.on('start_answering', data => {
   showScreen('screenAnswering');
   document.getElementById('ansQLabel').textContent = data.description || (currentQuestion && currentQuestion.description) || '';
   
-  const hasAI = data.has_ai; 
+  // 💡改回讀取 data 傳來的圖片，確保圖片 100% 顯示
+  const hasAI = data.has_ai && data.ai_image && data.canvas_image;
   const singleImg = document.getElementById('ansImage');
   const dualContainer = document.getElementById('dualImageContainer');
   
   if (hasAI) {
     singleImg.style.display = 'none';
     dualContainer.style.display = 'flex';
-    // 💡直接讀取本地暫存，瞬間顯示零延遲
-    document.getElementById('ansImageCanvas').src = lastCanvasImage;
-    document.getElementById('ansImageAI').src = lastAIImage;
+    document.getElementById('ansImageCanvas').src = data.canvas_image;
+    document.getElementById('ansImageAI').src = data.ai_image;
   } else {
     singleImg.style.display = 'block';
     dualContainer.style.display = 'none';
-    // 💡優先顯示 AI 圖，沒有的話顯示原圖
-    singleImg.src = lastAIImage || lastCanvasImage || '';
+    singleImg.src = data.image || '';
   }
 
   const colors = ['red-box','green-box','yellow-box','blue-box'];
@@ -319,9 +318,26 @@ socket.on('show_result', data => {
   }, 2000);
 });
 
-function renderFinishedRanking(ranking, isRankPoints = false) {
-  const top3 = ranking.slice(0, 3);
-  const rest = ranking.slice(3, 19); // 精準切出第 4 ~ 19 名 (共 16 項)
+function calculateRankPoints(rankingData) {
+    let players = rankingData.map(p => ({...p}));
+    let currentRank = 1;
+    for (let i = 0; i < players.length; i++) {
+        if (i > 0 && players[i].score === players[i - 1].score) {
+            players[i].rankPoints = players[i - 1].rankPoints;
+        } else {
+            currentRank = i + 1;
+            players[i].rankPoints = 20 - currentRank; 
+        }
+        players[i].displayRank = currentRank; 
+    }
+    return players;
+}
+
+ffunction renderFinishedRanking(ranking, isRankPoints = false) {
+  let processedRanking = isRankPoints ? calculateRankPoints(ranking) : ranking.map((p, i) => ({...p, displayRank: i + 1, rankPoints: p.score}));
+  
+  const top3 = processedRanking.slice(0, 3);
+  const rest = processedRanking.slice(3, 19); 
   
   const podium = document.getElementById('finalPodium');
   const order = [top3[1], top3[0], top3[2]].filter(Boolean);
@@ -330,7 +346,7 @@ function renderFinishedRanking(ranking, isRankPoints = false) {
   podium.innerHTML = order.map((p, i) => {
     const cls = classes[i];
     const scoreClass = isRankPoints ? 'score-pop' : '';
-    const scoreText = isRankPoints ? `${p.score} 積分` : `${p.score} 分`;
+    const scoreText = isRankPoints ? `${p.rankPoints} 積分` : `${p.score} 分`;
     return `
       <div class="podium-item">
         <div class="podium-name">${p.name}</div>
@@ -341,12 +357,11 @@ function renderFinishedRanking(ranking, isRankPoints = false) {
 
   const restContainer = document.getElementById('restRanking');
   restContainer.innerHTML = rest.map((p, i) => {
-    const rankNum = i + 4;
     const scoreClass = isRankPoints ? 'score-pop' : '';
-    const scoreText = isRankPoints ? `${p.score} 積分` : `${p.score} 分`;
+    const scoreText = isRankPoints ? `${p.rankPoints} 積分` : `${p.score} 分`;
     return `
       <div class="rest-item">
-        <span class="rest-rank-num">#${rankNum}</span>
+        <span class="rest-rank-num">#${p.displayRank}</span>
         <span class="rest-name">${p.name}</span>
         <span class="rest-score ${scoreClass}">${scoreText}</span>
       </div>`;
