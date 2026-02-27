@@ -35,13 +35,11 @@ game_state = {
     'canvas_data': None,
     'ai_image': None,
     'ai_style': None,
-    'drawing_active': False,
-    'last_canvas_update': 0,  
+    'drawing_active': False
 }
 
 MAX_PARTICIPANTS = 20
 MAX_QUESTIONS = 50
-CANVAS_UPDATE_THROTTLE = 0.1  
 
 def optimize_image_for_transfer(img, max_size=600, quality=75):
     if img.width > max_size or img.height > max_size:
@@ -51,85 +49,9 @@ def optimize_image_for_transfer(img, max_size=600, quality=75):
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 def process_image(image_data_url, style):
-    header, b64 = image_data_url.split(',', 1)
-    raw = base64.b64decode(b64)
-    img = Image.open(io.BytesIO(raw)).convert('RGB')
-    try:
-        import cv2
-        use_cv2 = True
-    except ImportError:
-        use_cv2 = False
-
-    if style == 'realistic':
-        img = ImageEnhance.Sharpness(img).enhance(3.0)
-        img = ImageEnhance.Contrast(img).enhance(1.5)
-        img = ImageEnhance.Color(img).enhance(1.2)
-        img = img.filter(ImageFilter.EDGE_ENHANCE_MORE)
-    elif style == 'ghibli':
-        img = img.filter(ImageFilter.SMOOTH_MORE)
-        img = ImageEnhance.Color(img).enhance(1.6)
-        img = ImageEnhance.Brightness(img).enhance(1.15)
-        img = ImageEnhance.Contrast(img).enhance(0.9)
-        r, g, b = img.split()
-        r = ImageEnhance.Brightness(r).enhance(1.08)
-        g = ImageEnhance.Brightness(g).enhance(1.03)
-        img = Image.merge('RGB', (r, g, b))
-        img = img.filter(ImageFilter.SMOOTH)
-    elif style == 'comic':
-        if use_cv2:
-            arr = np.array(img)
-            gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
-            blur = cv2.medianBlur(gray, 7)
-            edges = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 9, 9)
-            color = cv2.bilateralFilter(arr, 9, 300, 300)
-            color = (color // 48) * 48
-            edges_rgb = cv2.cvtColor(edges, cv2.COLOR_GRAY2RGB)
-            result = cv2.bitwise_and(color, edges_rgb)
-            img = Image.fromarray(result.astype(np.uint8))
-        else:
-            img = img.filter(ImageFilter.SMOOTH_MORE)
-            img = ImageEnhance.Color(img).enhance(2.0)
-            img = ImageEnhance.Contrast(img).enhance(1.8)
-        img = ImageEnhance.Color(img).enhance(1.5)
-    elif style == 'watercolor':
-        img = img.filter(ImageFilter.SMOOTH_MORE)
-        img = img.filter(ImageFilter.SMOOTH_MORE)
-        img = img.filter(ImageFilter.GaussianBlur(1))
-        img = ImageEnhance.Brightness(img).enhance(1.15)
-        img = ImageEnhance.Color(img).enhance(0.75)
-        img = ImageEnhance.Contrast(img).enhance(0.85)
-        arr = np.array(img, dtype=np.float32)
-        noise = np.random.normal(0, 6, arr.shape)
-        arr = np.clip(arr + noise, 0, 255).astype(np.uint8)
-        img = Image.fromarray(arr)
-    elif style == 'oil':
-        img = img.filter(ImageFilter.GaussianBlur(2))
-        img = ImageEnhance.Color(img).enhance(1.8)
-        img = ImageEnhance.Contrast(img).enhance(1.3)
-        img = img.filter(ImageFilter.EDGE_ENHANCE)
-        if use_cv2:
-            arr = np.array(img)
-            arr = cv2.bilateralFilter(arr, 15, 80, 80)
-            img = Image.fromarray(arr)
-        img = ImageEnhance.Sharpness(img).enhance(1.5)
-    elif style == 'scifi':
-        img = ImageEnhance.Contrast(img).enhance(1.6)
-        img = ImageEnhance.Sharpness(img).enhance(2.5)
-        r, g, b = img.split()
-        r = ImageEnhance.Brightness(r).enhance(0.75)
-        g = ImageEnhance.Brightness(g).enhance(0.9)
-        b = ImageEnhance.Brightness(b).enhance(1.35)
-        img = Image.merge('RGB', (r, g, b))
-        img = ImageEnhance.Color(img).enhance(1.4)
-        img = img.filter(ImageFilter.EDGE_ENHANCE_MORE)
-    else:
-        img = ImageEnhance.Sharpness(img).enhance(1.5)
-        img = ImageEnhance.Contrast(img).enhance(1.1)
-
-    return optimize_image_for_transfer(img, max_size=600, quality=75)
+    pass # 備用濾鏡
 
 def diffusion_generate(image_data_url, style):
-    """用 AI Horde (Stable Diffusion) 排隊生成圖片，徹底解決 429 問題"""
     header, b64 = image_data_url.split(',', 1)
     raw = base64.b64decode(b64)
     img = Image.open(io.BytesIO(raw)).convert('RGB')
@@ -176,7 +98,7 @@ def diffusion_generate(image_data_url, style):
     check_url  = f"https://aihorde.net/api/v2/generate/check/{job_id}"
     status_url = f"https://aihorde.net/api/v2/generate/status/{job_id}"
     
-    for i in range(25): # 最多等 75 秒
+    for i in range(25):
         time.sleep(3)
         try:
             check = http_requests.get(check_url, headers=req_headers, timeout=10).json()
@@ -208,6 +130,22 @@ def get_uid_by_sid(sid):
     for uid, p in game_state['participants'].items():
         if p['sid'] == sid: return uid
     return None
+
+# 👇 核心邏輯：強制產生 1-19 桌的完整排名
+def _get_full_ranking():
+    current_players = {v['name']: v['score'] for v in game_state['participants'].values()}
+    full_list = []
+    
+    # 產生 01桌 到 19桌 的資料
+    for i in range(1, 20):
+        name = f"{i:02d}桌"
+        # 如果有登入就抓他的分數，沒登入就是 0 分
+        score = current_players.get(name, 0)
+        full_list.append({'name': name, 'score': score})
+        
+    # 依照分數由高到低排序，分數相同則依桌號排序
+    return sorted(full_list, key=lambda x: (-x['score'], x['name']))
+
 
 @app.route('/')
 def index(): return render_template('admin.html')
@@ -314,6 +252,16 @@ def on_join_game(data):
     emit('join_success', payload)
     socketio.emit('participant_joined', {'name': name, 'participants': plist, 'count': len(plist)})
 
+    if game_state['status'] == 'result':
+        q = _current_question()
+        emit('show_result', {
+            'correct_answer': q['correct'],
+            'correct_text': q['options'][ord(q['correct']) - ord('A')],
+            'ranking': _get_full_ranking() # 使用全 19 桌
+        })
+    elif game_state['status'] == 'finished':
+        emit('game_finished', {'ranking': _get_full_ranking()}) # 使用全 19 桌
+
 @socketio.on('request_rename')
 def on_request_rename():
     uid = get_uid_by_sid(request.sid)
@@ -382,23 +330,28 @@ def on_admin_next_question():
     else:
         _show_question()
 
+# 👇 修改：計算名次積分時，將未加入的玩家分數設為 0
 @socketio.on('admin_show_rank_points')
 def on_admin_show_rank_points():
-    ranking = _get_ranking()
-    total = len(ranking)
+    full_ranking = _get_full_ranking()
+    joined_names = [v['name'] for v in game_state['participants'].values()]
     rank_data = []
-    for i, r in enumerate(ranking):
-        pts = total - i 
+    
+    for i, r in enumerate(full_ranking):
+        # 只有有加入遊戲的人才配拿 19~1 的分數，沒加入的一律給 0 積分
+        if r['name'] in joined_names:
+            pts = 19 - i
+        else:
+            pts = 0
         rank_data.append({'name': r['name'], 'score': pts, 'original_score': r['score']})
+        
     socketio.emit('show_rank_points_screen', {'ranking': rank_data})
 
 @socketio.on('drawing_update')
 def on_drawing_update(data):
-    if time.time() - game_state.get('last_canvas_update', 0) < CANVAS_UPDATE_THROTTLE:
-        game_state['canvas_data'] = data.get('image'); return
-    game_state['last_canvas_update'] = time.time()
     game_state['canvas_data'] = data.get('image')
-    socketio.emit('canvas_update', {'image': data.get('image')}, broadcast=True)
+    game_state['drawing_active'] = True
+    socketio.emit('canvas_update', {'image': data.get('image')})
 
 @socketio.on('submit_answer')
 def on_submit_answer(data):
@@ -418,7 +371,7 @@ def on_submit_answer(data):
     total_gain = base + time_bonus + streak_bonus
     p['score'] += total_gain
 
-    ranking = _get_ranking()
+    ranking = _get_full_ranking()
     my_rank = next((i+1 for i, r in enumerate(ranking) if r['name'] == p['name']), 0)
 
     emit('answer_result', {
@@ -427,6 +380,7 @@ def on_submit_answer(data):
         'total_score': p['score'], 'rank': my_rank, 'streak': p['streak'],
     })
 
+    # 判斷全員是否答完時，只算「目前有在線上的人」
     online_p = [v for v in game_state['participants'].values() if v.get('online', True)]
     answered_count = sum(1 for v in online_p if v['answered'])
     total_count = len(online_p)
@@ -442,13 +396,13 @@ def on_admin_show_result(): _auto_show_result()
 def on_timer_ended(): _auto_show_result()
 
 def _current_question(): return game_state['questions'][game_state['current_question']]
-def _get_ranking(): return sorted([{'sid': v['sid'], 'name': v['name'], 'score': v['score']} for v in game_state['participants'].values()], key=lambda x: x['score'], reverse=True)
 
 def _auto_show_result():
     if game_state['status'] != 'answering': return
     game_state['status'] = 'result'
     q = _current_question()
-    socketio.emit('show_result', {'correct_answer': q['correct'], 'correct_text': q['options'][ord(q['correct']) - ord('A')], 'ranking': _get_ranking()[:10]})
+    # 廣播全 19 桌的排名
+    socketio.emit('show_result', {'correct_answer': q['correct'], 'correct_text': q['options'][ord(q['correct']) - ord('A')], 'ranking': _get_full_ranking()})
 
 def _show_question():
     game_state['status'] = 'question'
@@ -457,7 +411,7 @@ def _show_question():
 
 def _finish_game():
     game_state['status'] = 'finished'
-    socketio.emit('game_finished', {'ranking': _get_ranking()})
+    socketio.emit('game_finished', {'ranking': _get_full_ranking()})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
@@ -466,9 +420,5 @@ if __name__ == '__main__':
     print(f"📺 1. 大螢幕展示畫面 : http://127.0.0.1:{port}/show")
     print(f"🛠️ 2. 管理員控制台   : http://127.0.0.1:{port}/admin")
     print(f"📱 3. 玩家答題畫面   : http://127.0.0.1:{port}/game")
-    print("-" * 55)
-    print("💡 區域網路測試提醒：")
-    print("如果想用真實的手機測試，請將上方網址中的 '127.0.0.1' ")
-    print("替換成你這台電腦的區域網路 IP (通常是 192.168.X.X)")
     print("="*55 + "\n")
     socketio.run(app, host='0.0.0.0', port=port, debug=False)

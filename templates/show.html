@@ -68,17 +68,19 @@
   .option-box.correct { filter: brightness(1.4); border-width: 4px; }
   .option-letter { font-family: 'Space Mono', monospace; font-size: 1.4vw; }
 
-  #screenResult { background: #050508; }
-  .result-title { font-family: 'Bebas Neue', sans-serif; font-size: 4vw; color: var(--accent); letter-spacing: 0.05em; margin-bottom: 24px; }
-  .ranking-list { width: 60vw; display: flex; flex-direction: column; gap: 10px; }
-  .rank-row { display: flex; align-items: center; gap: 16px; background: rgba(255,255,255,0.05); border-radius: 14px; padding: 14px 24px; font-size: 1.8vw; }
-  .rank-num { font-family: 'Space Mono', monospace; width: 2em; text-align: center; font-size: 2vw; }
+  /* ── RESULT 單題排行榜 (更新為 4 欄網格以容納 19 人) ── */
+  #screenResult { background: #050508; justify-content: flex-start; padding-top: 5vh; }
+  .result-title { font-family: 'Bebas Neue', sans-serif; font-size: 4vw; color: var(--accent); letter-spacing: 0.05em; margin-bottom: 10px; }
+  .ranking-grid { width: 90vw; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; }
+  .rank-row { display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.05); border-radius: 12px; padding: 12px 16px; font-size: 1.4vw; }
+  .rank-num { font-family: 'Space Mono', monospace; width: 2em; text-align: center; font-size: 1.6vw; }
   .rank-name { flex: 1; font-weight: 700; }
-  .rank-score { font-family: 'Space Mono', monospace; color: var(--accent); font-size: 1.8vw; }
+  .rank-score { font-family: 'Space Mono', monospace; color: var(--accent); font-size: 1.4vw; font-weight: 700; }
   .rank-row.gold { background: rgba(234,179,8,0.2); border: 1px solid var(--yellow); }
   .rank-row.silver { background: rgba(148,163,184,0.15); border: 1px solid #94a3b8; }
   .rank-row.bronze { background: rgba(180,83,9,0.2); border: 1px solid #b45309; }
 
+  /* ── FINISHED 最終頒獎台 (包含 16 人網格) ── */
   #screenFinished { background: #050508; overflow-y: auto; justify-content: flex-start; padding-top: 4vh; }
   .firework { position: absolute; width: 100%; height: 100%; pointer-events: none; }
   .finished-title { font-family: 'Bebas Neue', sans-serif; font-size: 5vw; color: var(--accent); text-shadow: 0 0 60px rgba(168,85,247,0.6); margin-bottom: 20px; position: relative; z-index: 1; transition: all 0.5s; }
@@ -93,12 +95,12 @@
   .blink { animation: blink 0.8s infinite alternate; }
   @keyframes blink { to { opacity: 0.3; } }
 
-  .rest-ranking { width: 85vw; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; position: relative; z-index: 1; padding-bottom: 40px; }
+  .rest-ranking { width: 90vw; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; position: relative; z-index: 1; padding-bottom: 40px; }
   .rest-item { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
   .rest-rank-num { font-family: 'Space Mono', monospace; font-size: 1.2vw; color: #888; }
   .rest-name { font-weight: 700; font-size: 1.4vw; flex: 1; text-align: center; }
   .rest-score { font-family: 'Space Mono', monospace; font-size: 1.4vw; color: var(--accent); font-weight: 700; transition: color 0.5s; }
-  .score-pop { animation: popScore 0.5s ease-out; color: var(--yellow) !important; }
+  .score-pop { animation: popScore 0.5s ease-out; color: var(--yellow) !important; transform: scale(1.1); }
   @keyframes popScore { 50% { transform: scale(1.3); } }
 </style>
 </head>
@@ -159,7 +161,8 @@
 
 <div class="screen hidden" id="screenResult">
   <div class="result-title">📊 本題排名</div>
-  <div class="ranking-list" id="rankingList"></div>
+  <div id="correctAnswerLabel" style="text-align:center; font-size:1.6vw; color:var(--green); font-weight:700;">✅ 正確答案</div>
+  <div class="ranking-grid" id="rankingGrid"></div>
 </div>
 
 <div class="screen hidden" id="screenFinished">
@@ -291,13 +294,16 @@ socket.on('show_result', data => {
   
   setTimeout(() => {
     showScreen('screenResult');
-    const list = document.getElementById('rankingList');
+    const grid = document.getElementById('rankingGrid');
+    const label = document.getElementById('correctAnswerLabel');
     const medals = ['🥇','🥈','🥉']; const classes = ['gold','silver','bronze'];
-    const correctLabel = data.correct_text ? `${correct}: ${data.correct_text}` : correct;
-    list.innerHTML = `<div style="text-align:center;margin-bottom:14px;font-size:1.4vw;color:var(--green);font-weight:700;">✅ 正確答案：${correctLabel}</div>` +
-      data.ranking.map((r,i) => `
+    
+    label.textContent = `✅ 正確答案：${data.correct_text ? `${correct}: ${data.correct_text}` : correct}`;
+    
+    // 渲染全 19 桌的本題成績網格
+    grid.innerHTML = data.ranking.map((r,i) => `
       <div class="rank-row ${classes[i] || ''}">
-        <span class="rank-num">${medals[i] || (i+1)}</span>
+        <span class="rank-num">${medals[i] || '#' + (i+1)}</span>
         <span class="rank-name">${r.name}</span>
         <span class="rank-score">${r.score} 分</span>
       </div>
@@ -307,7 +313,7 @@ socket.on('show_result', data => {
 
 function renderFinishedRanking(ranking, isRankPoints = false) {
   const top3 = ranking.slice(0, 3);
-  const rest = ranking.slice(3, 19);
+  const rest = ranking.slice(3, 19); // 精準切出第 4 ~ 19 名 (共 16 項)
   
   const podium = document.getElementById('finalPodium');
   const order = [top3[1], top3[0], top3[2]].filter(Boolean);
@@ -352,7 +358,9 @@ socket.on('show_rank_points_screen', data => {
 });
 
 function renderParticipants(list, count) {
-  document.getElementById('wCount').textContent = `${count} / 20 位參賽者`;
+  // 過濾掉沒登入的人數計算
+  const onlineCount = list.filter(p => p.online).length;
+  document.getElementById('wCount').textContent = `${onlineCount} / 19 桌已就緒`;
   const sorted = [...list].sort((a, b) => parseInt(a.name) - parseInt(b.name));
   document.getElementById('wParticipants').innerHTML = sorted.map(p => `<div class="w-participant">${p.name}</div>`).join('');
 }

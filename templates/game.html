@@ -345,6 +345,7 @@ socket.on('show_result', data => {
     const screen = document.getElementById('screenResult'); screen.className = 'screen' + (d.rank===1?' bg-gold':d.rank===2?' bg-silver':d.rank===3?' bg-bronze':'');
     if (d.rank <= 3 && navigator.vibrate) navigator.vibrate([100, 50, 100]); showScreen('screenResult');
   } else {
+    // 重連玩家的顯示相容邏輯
     const colors = {A:'#ef4444', B:'#22c55e', C:'#eab308', D:'#3b82f6'}; const correct = data.correct_answer; const tag = document.getElementById('correctTag');
     tag.textContent = `✓ ${data.correct_answer} 選項`; tag.style.background = colors[correct] + '33'; tag.style.border = `2px solid ${colors[correct]}`; tag.style.color = colors[correct];
     document.getElementById('baseScore').textContent = '+0'; document.getElementById('timeBonus').textContent = '+0'; document.getElementById('streakBonus').textContent = '+0';
