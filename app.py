@@ -409,7 +409,7 @@ def on_submit_answer(data):
     if correct:
         # 答對了，連續次數 +1，並給予獎勵
         p['streak'] = p.get('streak', 0) + 1
-        streak_bonus = p['streak'] * 10
+        streak_bonus = (p['streak']-1) * 10
     else:
         # 答錯了，連續次數立即歸零
         p['streak'] = 0
