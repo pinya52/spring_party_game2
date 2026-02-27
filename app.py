@@ -131,21 +131,16 @@ def get_uid_by_sid(sid):
         if p['sid'] == sid: return uid
     return None
 
-# 👇 核心邏輯：強制產生 1-19 桌的完整排名
 def _get_full_ranking():
     current_players = {v['name']: v['score'] for v in game_state['participants'].values()}
     full_list = []
     
-    # 產生 01桌 到 19桌 的資料
     for i in range(1, 20):
         name = f"{i:02d}桌"
-        # 如果有登入就抓他的分數，沒登入就是 0 分
         score = current_players.get(name, 0)
         full_list.append({'name': name, 'score': score})
         
-    # 依照分數由高到低排序，分數相同則依桌號排序
     return sorted(full_list, key=lambda x: (-x['score'], x['name']))
-
 
 @app.route('/')
 def index(): return render_template('admin.html')
@@ -164,6 +159,27 @@ def api_state():
         'total_questions': len(game_state['questions']),
         'participant_count': len(game_state['participants']),
         'participants': [{'sid': v['sid'], 'name': v['name'], 'score': v['score'], 'online': v.get('online', True)} for v in game_state['participants'].values()],
+    })
+
+# 👇 新增：給手機端短輪詢 (Polling) 防漏接收的 API
+@app.route('/api/get-game-state')
+def api_get_game_state():
+    q_data = None
+    if game_state['status'] in ['question', 'answering', 'result'] and game_state['questions'] and game_state['current_question'] < len(game_state['questions']):
+        q = _current_question()
+        q_data = {
+            'index': game_state['current_question'],
+            'total': len(game_state['questions']),
+            'description': q['description'],
+            'options': q['options'],
+            'correct': q['correct'] if game_state['status'] == 'result' else None
+        }
+    
+    return jsonify({
+        'phase': game_state['status'],
+        'imageData': game_state.get('canvas_data') or game_state.get('ai_image'),
+        'players': _get_full_ranking(),
+        'question': q_data
     })
 
 @app.route('/api/upload_questions', methods=['POST'])
@@ -257,10 +273,10 @@ def on_join_game(data):
         emit('show_result', {
             'correct_answer': q['correct'],
             'correct_text': q['options'][ord(q['correct']) - ord('A')],
-            'ranking': _get_full_ranking() # 使用全 19 桌
+            'ranking': _get_full_ranking()
         })
     elif game_state['status'] == 'finished':
-        emit('game_finished', {'ranking': _get_full_ranking()}) # 使用全 19 桌
+        emit('game_finished', {'ranking': _get_full_ranking()})
 
 @socketio.on('request_rename')
 def on_request_rename():
@@ -330,20 +346,16 @@ def on_admin_next_question():
     else:
         _show_question()
 
-# 👇 修改：計算名次積分時，將未加入的玩家分數設為 0
+# 👇 修正排名發送，傳送原始分數給前端處理同分邏輯
 @socketio.on('admin_show_rank_points')
 def on_admin_show_rank_points():
     full_ranking = _get_full_ranking()
     joined_names = [v['name'] for v in game_state['participants'].values()]
     rank_data = []
     
-    for i, r in enumerate(full_ranking):
-        # 只有有加入遊戲的人才配拿 19~1 的分數，沒加入的一律給 0 積分
-        if r['name'] in joined_names:
-            pts = 19 - i
-        else:
-            pts = 0
-        rank_data.append({'name': r['name'], 'score': pts, 'original_score': r['score']})
+    for r in full_ranking:
+        # 將原始分數以及是否有加入遊戲的資訊傳送給前端
+        rank_data.append({'name': r['name'], 'score': r['score'], 'joined': r['name'] in joined_names})
         
     socketio.emit('show_rank_points_screen', {'ranking': rank_data})
 
@@ -380,7 +392,6 @@ def on_submit_answer(data):
         'total_score': p['score'], 'rank': my_rank, 'streak': p['streak'],
     })
 
-    # 判斷全員是否答完時，只算「目前有在線上的人」
     online_p = [v for v in game_state['participants'].values() if v.get('online', True)]
     answered_count = sum(1 for v in online_p if v['answered'])
     total_count = len(online_p)
@@ -401,7 +412,6 @@ def _auto_show_result():
     if game_state['status'] != 'answering': return
     game_state['status'] = 'result'
     q = _current_question()
-    # 廣播全 19 桌的排名
     socketio.emit('show_result', {'correct_answer': q['correct'], 'correct_text': q['options'][ord(q['correct']) - ord('A')], 'ranking': _get_full_ranking()})
 
 def _show_question():

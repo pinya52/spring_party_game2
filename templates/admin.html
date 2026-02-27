@@ -54,6 +54,24 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; background: #334155; }
+
+  /* 👇 全螢幕繪畫區域的 CSS 設定 */
+  :fullscreen #drawWorkspace {
+      background: var(--bg);
+      width: 100vw;
+      height: 100vh;
+      padding: 20px;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+  }
+  :fullscreen .canvas-container {
+      height: calc(100vh - 120px);
+  }
+  :fullscreen canvas {
+      max-height: 100%;
+      max-width: 100%;
+  }
 </style>
 </head>
 <body>
@@ -103,7 +121,7 @@
   <button class="btn btn-danger" onclick="resetGame()" style="margin-top:auto;">⚠️ 重置整個遊戲</button>
 </div>
 
-<div class="workspace">
+<div class="workspace" id="drawWorkspace">
   <div class="toolbar">
     <div class="tool-group">
       <div class="color-btn active" style="background:#000" onclick="setColor('#000', this)"></div>
@@ -119,7 +137,10 @@
       <input type="range" id="brushSize" min="2" max="30" value="5">
     </div>
     <div style="width:1px; height:24px; background:#334155; margin:0 8px;"></div>
-    <button class="btn btn-outline" style="width:auto; padding:8px 16px; margin:0;" onclick="clearCanvas()">🗑️ 清空畫布</button>
+    
+    <button class="btn btn-outline" id="undoBtn" style="width:auto; padding:8px 16px; margin:0;">↩ 復原</button>
+    <button class="btn btn-outline" onclick="clearCanvas()" style="width:auto; padding:8px 16px; margin:0;">🗑️ 清空畫布</button>
+    <button class="btn btn-outline" id="fullscreenBtn" style="width:auto; padding:8px 16px; margin:0;" title="切換全螢幕">⛶ 全螢幕</button>
     
     <div style="margin-left:auto; display:flex; gap:8px;">
       <select id="aiStyle">
@@ -233,6 +254,7 @@ function resetGame() {
   }
 }
 
+// 👇 畫布與全螢幕、復原邏輯 👇
 const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
 let isDrawing = false;
@@ -240,9 +262,42 @@ let currentX = 0; let currentY = 0;
 let brushColor = '#000000';
 let brushSize = 5;
 let lastEmitTime = 0;
+let drawingHistory = []; // 儲存筆畫歷史
 
 ctx.fillStyle = '#ffffff';
 ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+// 全螢幕切換
+document.getElementById('fullscreenBtn').addEventListener('click', () => {
+    const ws = document.getElementById('drawWorkspace');
+    if (!document.fullscreenElement) {
+        ws.requestFullscreen().catch(err => alert(err.message));
+    } else {
+        document.exitFullscreen();
+    }
+});
+
+// 儲存狀態供復原
+function saveCanvasState() {
+    drawingHistory.push(canvas.toDataURL('image/png'));
+    if(drawingHistory.length > 20) drawingHistory.shift();
+}
+
+// 復原上一筆
+document.getElementById('undoBtn').addEventListener('click', () => {
+    if(drawingHistory.length > 0) {
+        let lastState = drawingHistory.pop();
+        let img = new Image();
+        img.src = lastState;
+        img.onload = () => {
+            ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+            emitCanvas();
+        };
+    } else {
+        clearCanvas(true);
+    }
+});
 
 function setColor(color, el) {
   brushColor = color;
@@ -252,6 +307,7 @@ function setColor(color, el) {
 document.getElementById('brushSize').addEventListener('input', e => { brushSize = e.target.value; });
 
 function clearCanvas(broadcast = true) {
+  saveCanvasState();
   ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
   if (broadcast) { socket.emit('clear_canvas'); emitCanvas(); }
 }
@@ -267,6 +323,7 @@ function getPos(e) {
 
 function startDraw(e) {
   e.preventDefault(); isDrawing = true;
+  saveCanvasState(); // 下筆前儲存歷史紀錄
   const pos = getPos(e); currentX = pos.x; currentY = pos.y;
   ctx.beginPath(); ctx.fillStyle = brushColor; ctx.arc(currentX, currentY, brushSize/2, 0, Math.PI*2); ctx.fill();
 }

@@ -92,11 +92,21 @@
   .score-row.total .value { font-size: 1.4rem; }
   .rank-display { font-size: 2.5rem; font-weight: 900; }
 
-  #screenFinished { gap: 16px; }
-  .final-medal { font-size: 5rem; }
-  .final-rank { font-size: 1.4rem; font-weight: 900; color: var(--accent); }
-  .final-score-num { font-family: 'Space Mono', monospace; font-size: 2rem; }
-  .btn-restart { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 12px; padding: 14px 32px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; }
+  /* 排行榜: 頒獎台與名單 */
+  #screenFinished { gap: 16px; justify-content: flex-start; padding-top: 40px; }
+  .final-rank { font-size: 1.4rem; font-weight: 900; color: var(--accent); margin-bottom: 10px; }
+  
+  .podium-container { display: flex; align-items: flex-end; justify-content: center; gap: 8px; margin-bottom: 24px; margin-top: 16px; height: 180px; width: 100%; }
+  .podium-step { display: flex; flex-direction: column; align-items: center; width: 30%; max-width: 90px; }
+  .podium-step .step { width: 100%; border-radius: 8px 8px 0 0; box-shadow: 0 4px 6px rgba(0,0,0,0.3); text-align: center; }
+  .podium-player-name { font-weight: bold; margin-bottom: 4px; font-size: 0.85rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; }
+  .podium-points { margin-bottom: 4px; color: var(--accent); font-weight: 900; font-size: 1.1rem; }
+  
+  .normal-list { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 360px; margin: 0 auto; text-align: left; max-height: 45vh; overflow-y: auto; padding-right: 4px; }
+  .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--surface); border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); border: 1px solid var(--border); }
+  .rank-badge { background: var(--surface2); color: var(--text); border-radius: 50%; width: 28px; height: 28px; display: inline-flex; justify-content: center; align-items: center; margin-right: 12px; font-size: 0.85rem; font-weight: 900; border: 1px solid var(--border); }
+
+  .btn-restart { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 12px; padding: 14px 32px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; margin-top: 20px;}
 
   .bg-gold { background: linear-gradient(180deg, rgba(234,179,8,0.15), var(--bg)); }
   .bg-silver { background: linear-gradient(180deg, rgba(148,163,184,0.1), var(--bg)); }
@@ -128,7 +138,7 @@
     <div class="welcome-icon">🎉</div>
   </div>
   <div class="welcome-name" id="welcomeName"></div>
-  <div class="wait-text">成功加入！<br>等待管理員開始遊戲...</div>
+  <div class="wait-text">成功加入！<br>等待管理員開始遊戲或切換題目...</div>
   <button id="btnRename" onclick="requestRename()" style="margin-top:24px;background:transparent;border:1px solid var(--border);color:var(--muted); border-radius:10px;padding:10px 24px;font-size:0.88rem;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">✏️ 重新輸入桌號</button>
 </div>
 
@@ -178,11 +188,9 @@
 </div>
 
 <div class="screen" id="screenFinished">
-  <div class="final-medal" id="finalMedal">🎮</div>
-  <div class="final-rank" id="finalRankText"></div>
-  <div style="color:var(--muted);font-size:0.9rem;">總分</div>
-  <div class="final-score-num" id="finalScoreNum">0</div>
-  <button class="btn-restart" onclick="restart()">重新開始</button>
+  <div class="final-rank" id="finalRankText">🏆 排名與積分榜</div>
+  <div id="leaderboardContent" style="width:100%;"></div>
+  <button class="btn-restart" onclick="restart()">返回首頁重登</button>
 </div>
 
 <div id="toast"></div>
@@ -190,6 +198,7 @@
 <script>
 const socket = io({ transports: ['websocket', 'polling'] });
 let myName = '';
+let currentPhase = 'screenLogin';
 let timerInterval = null;
 let answeredThisRound = false;
 let pendingResult = null;
@@ -203,6 +212,7 @@ window.onload = () => {
 };
 
 function showScreen(id) {
+  currentPhase = id;
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
@@ -219,7 +229,7 @@ socket.on('disconnect', () => {
 function joinGame() {
   const raw = document.getElementById('nameInput').value.trim();
   if (!raw) { setError('請輸入桌號'); return; }
-  if (!/^(0[1-9]|1[0-9])$/.test(raw)) { setError('請輸入 01–19 之間的兩位數字（例如：05）'); return; }
+  if (!/^(0[1-9]|1[0-9])$/.test(raw)) { setError('請輸入 01–19 之間的數字（例如：05）'); return; }
   setError('');
   localStorage.setItem('my_table_number', raw);
   socket.emit('join_game', { number: raw });
@@ -259,18 +269,7 @@ socket.on('join_success', data => {
     } else {
       answeredThisRound = false;
       showScreen('screenAnswering');
-      const colors = [
-        {cls:'red-btn', letter:'A', letterBg:'#ef4444'}, {cls:'green-btn', letter:'B', letterBg:'#22c55e'},
-        {cls:'yellow-btn', letter:'C', letterBg:'#eab308'}, {cls:'blue-btn', letter:'D', letterBg:'#3b82f6'},
-      ];
-      const col = document.getElementById('optionsCol');
-      if (data.question && data.question.options) {
-        col.innerHTML = data.question.options.map((opt, i) => `
-          <button class="option-btn ${colors[i].cls}" onclick="selectAnswer('${colors[i].letter}', this)" id="btnOpt${colors[i].letter}">
-            <span class="letter" style="background:${colors[i].letterBg}">${colors[i].letter}</span> ${opt} <span class="check-mark">✓</span>
-          </button>
-        `).join('');
-      }
+      renderOptionsUI(data.question ? data.question.options : []);
       startAnswerTimer(15); 
     }
   } 
@@ -278,6 +277,29 @@ socket.on('join_success', data => {
     showScreen('screenWaitResult'); 
   }
 });
+
+// ==========================================
+// 🚨 防漏接收的 Polling 機制
+// ==========================================
+setInterval(async () => {
+  if (!myName) return; // 沒登入不執行
+  try {
+    const res = await fetch('/api/get-game-state');
+    const data = await res.json();
+    
+    // 如果事件遺失導致停留在錯誤畫面，強制切換
+    if (data.phase === 'answering' && currentPhase !== 'screenAnswering' && currentPhase !== 'screenWaitResult' && !answeredThisRound) {
+        showScreen('screenAnswering');
+        if (data.question && document.getElementById('optionsCol').innerHTML === '') {
+            renderOptionsUI(data.question.options);
+            startAnswerTimer(20);
+        }
+    } else if (data.phase === 'waiting' && currentPhase !== 'screenWaiting' && currentPhase !== 'screenLogin') {
+        showScreen('screenWaiting');
+    }
+
+  } catch (err) { console.error('Polling error', err); }
+}, 2000);
 
 socket.on('show_question', data => {
   answeredThisRound = false; pendingResult = null; clearInterval(timerInterval);
@@ -290,18 +312,23 @@ socket.on('show_question', data => {
 
 socket.on('start_answering', data => {
   answeredThisRound = false; showScreen('screenAnswering');
+  renderOptionsUI(data.options);
+  startAnswerTimer(data.duration || 20);
+});
+
+function renderOptionsUI(options) {
   const colors = [
     {cls:'red-btn', letter:'A', letterBg:'#ef4444'}, {cls:'green-btn', letter:'B', letterBg:'#22c55e'},
     {cls:'yellow-btn', letter:'C', letterBg:'#eab308'}, {cls:'blue-btn', letter:'D', letterBg:'#3b82f6'},
   ];
   const col = document.getElementById('optionsCol');
-  col.innerHTML = data.options.map((opt, i) => `
+  if(!options) return;
+  col.innerHTML = options.map((opt, i) => `
     <button class="option-btn ${colors[i].cls}" onclick="selectAnswer('${colors[i].letter}', this)" id="btnOpt${colors[i].letter}">
       <span class="letter" style="background:${colors[i].letterBg}">${colors[i].letter}</span> ${opt} <span class="check-mark">✓</span>
     </button>
   `).join('');
-  startAnswerTimer(data.duration || 20);
-});
+}
 
 function selectAnswer(letter, el) {
   if (answeredThisRound) return;
@@ -342,35 +369,99 @@ socket.on('show_result', data => {
     tag.textContent = `✓ ${labels[correct]}`; tag.style.background = colors[correct] + '33'; tag.style.border = `2px solid ${colors[correct]}`; tag.style.color = colors[correct];
     document.getElementById('baseScore').textContent = '+' + d.base_score; document.getElementById('timeBonus').textContent = '+' + d.time_bonus; document.getElementById('streakBonus').textContent = '+' + d.streak_bonus; document.getElementById('totalScore').textContent = d.total_score;
     const rankEl = document.getElementById('myRank'); rankEl.textContent = ['🥇','🥈','🥉'][d.rank-1] || '#' + d.rank;
-    const screen = document.getElementById('screenResult'); screen.className = 'screen' + (d.rank===1?' bg-gold':d.rank===2?' bg-silver':d.rank===3?' bg-bronze':'');
+    const screen = document.getElementById('screenResult'); screen.className = 'screen active' + (d.rank===1?' bg-gold':d.rank===2?' bg-silver':d.rank===3?' bg-bronze':'');
     if (d.rank <= 3 && navigator.vibrate) navigator.vibrate([100, 50, 100]); showScreen('screenResult');
   } else {
-    // 重連玩家的顯示相容邏輯
     const colors = {A:'#ef4444', B:'#22c55e', C:'#eab308', D:'#3b82f6'}; const correct = data.correct_answer; const tag = document.getElementById('correctTag');
     tag.textContent = `✓ ${data.correct_answer} 選項`; tag.style.background = colors[correct] + '33'; tag.style.border = `2px solid ${colors[correct]}`; tag.style.color = colors[correct];
     document.getElementById('baseScore').textContent = '+0'; document.getElementById('timeBonus').textContent = '+0'; document.getElementById('streakBonus').textContent = '+0';
     const me = data.ranking ? data.ranking.find(r => r.name === myName) : null; document.getElementById('totalScore').textContent = me ? me.score : '-';
     const myIdx = data.ranking ? data.ranking.findIndex(r => r.name === myName) : -1; const rank = myIdx + 1; document.getElementById('myRank').textContent = rank > 0 ? (['🥇','🥈','🥉'][rank-1] || '#' + rank) : '-';
-    const screen = document.getElementById('screenResult'); screen.className = 'screen'; showScreen('screenResult');
+    const screen = document.getElementById('screenResult'); screen.className = 'screen active'; showScreen('screenResult');
   }
   pendingResult = null;
 });
 
-socket.on('game_finished', data => {
-  const myEntry = data.ranking.find(r => r.name === myName); const rank = myEntry ? data.ranking.indexOf(myEntry) + 1 : 0;
-  const medals = ['🥇','🥈','🥉']; const congrats = ['恭喜獲得第一名！','恭喜獲得第二名！','恭喜獲得第三名！'];
-  document.getElementById('finalMedal').textContent = medals[rank-1] || '🎮'; document.getElementById('finalRankText').textContent = rank <= 3 ? congrats[rank-1] : `最終排名：第 ${rank} 名`; document.getElementById('finalScoreNum').textContent = myEntry ? myEntry.score + ' 分' : '0 分';
-  const screen = document.getElementById('screenFinished'); screen.className = 'screen' + (rank===1?' bg-gold':rank===2?' bg-silver':rank===3?' bg-bronze':'');
-  if (rank <= 3 && navigator.vibrate) navigator.vibrate([200,100,200,100,400]); showScreen('screenFinished');
+// ==========================================
+// 🏆 1-19 積分排行榜與頒獎台邏輯
+// ==========================================
+socket.on('show_rank_points_screen', data => {
+  renderLeaderboard(data.ranking); // data.ranking 為帶有原始 score 與 joined 狀態的資料
+  const myEntry = data.ranking.find(r => r.name === myName);
+  const rank = myEntry ? myEntry.displayRank : 0;
+  
+  const screen = document.getElementById('screenFinished'); 
+  screen.className = 'screen active' + (rank===1?' bg-gold':rank===2?' bg-silver':rank===3?' bg-bronze':'');
+  if (rank <= 3 && navigator.vibrate) navigator.vibrate([200,100,200,100,400]); 
+  showScreen('screenFinished');
 });
 
-socket.on('show_rank_points_screen', data => {
-  const myEntry = data.ranking.find(r => r.name === myName); const rank = myEntry ? data.ranking.indexOf(myEntry) + 1 : 0;
-  const medals = ['🥇','🥈','🥉']; const congrats = ['恭喜獲得第一名！','恭喜獲得第二名！','恭喜獲得第三名！'];
-  document.getElementById('finalMedal').textContent = medals[rank-1] || '🏆'; document.getElementById('finalRankText').textContent = rank <= 3 ? congrats[rank-1] : `最終名次：第 ${rank} 名`; document.getElementById('finalScoreNum').textContent = myEntry ? myEntry.score + ' 積分' : '0 積分';
-  const screen = document.getElementById('screenFinished'); screen.className = 'screen' + (rank===1?' bg-gold':rank===2?' bg-silver':rank===3?' bg-bronze':'');
-  if (rank <= 3 && navigator.vibrate) navigator.vibrate([200,100,200,100,400]); showScreen('screenFinished');
+socket.on('game_finished', data => {
+  // 將資料轉為含 joined 屬性
+  const joinedRanking = data.ranking.map(r => ({...r, joined: true}));
+  renderLeaderboard(joinedRanking);
+  showScreen('screenFinished');
 });
+
+// 計算名次積分與渲染 UI
+function renderLeaderboard(rankingData) {
+  // 從後端來的已經由高到低排好
+  let players = rankingData.map(p => ({...p}));
+  let currentRank = 1;
+  
+  for (let i = 0; i < players.length; i++) {
+    if (i > 0 && players[i].score === players[i - 1].score) {
+      // 同分者拿一樣的積分
+      players[i].rankPoints = players[i - 1].rankPoints;
+    } else {
+      // 根據實質排序給積分 (第一名19分，第二名18分...)
+      currentRank = i + 1;
+      players[i].rankPoints = 20 - currentRank; 
+    }
+    // 未登入加入的玩家強制歸 0
+    if (players[i].joined === false) players[i].rankPoints = 0;
+    
+    players[i].displayRank = currentRank; 
+  }
+
+  const container = document.getElementById('leaderboardContent');
+  if (!container) return;
+
+  // 繪製前三名頒獎台
+  let html = `<div class="podium-container">`;
+  if (players[1]) html += generatePodiumHTML(players[1], 2);
+  if (players[0]) html += generatePodiumHTML(players[0], 1);
+  if (players[2]) html += generatePodiumHTML(players[2], 3);
+  html += `</div>`;
+
+  // 繪製 4-19 名清單
+  if (players.length > 3) {
+    html += `<div class="normal-list">`;
+    for (let i = 3; i < players.length; i++) {
+      html += `
+      <div class="list-item">
+          <span><span class="rank-badge">${players[i].displayRank}</span> ${players[i].name}</span>
+          <span style="color:var(--accent); font-weight:bold;">${players[i].rankPoints} 積分</span>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  container.innerHTML = html;
+}
+
+// 產生頒獎台 HTML
+function generatePodiumHTML(player, position) {
+  const heightMap = {1: '130px', 2: '90px', 3: '50px'};
+  const colorMap = {1: '#f59e0b', 2: '#94a3b8', 3: '#b45309'}; 
+  return `
+  <div class="podium-step podium-${position}">
+      <div class="podium-player-name">${player.name}</div>
+      <div class="podium-points">${player.rankPoints}分</div>
+      <div class="step" style="height:${heightMap[position]}; background:${colorMap[position]};">
+          <span style="font-size: 2rem; color: rgba(255,255,255,0.5); font-weight: 900; margin-top: 10px; display: block;">${position}</span>
+      </div>
+  </div>`;
+}
 
 function restart() { myName = ''; localStorage.removeItem('my_table_number'); document.getElementById('nameInput').value = ''; showScreen('screenLogin'); }
 function setError(msg) { document.getElementById('errorMsg').textContent = msg; }
