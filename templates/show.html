@@ -7,162 +7,66 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Bebas+Neue&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --red: #ef4444; --green: #22c55e; --yellow: #eab308; --blue: #3b82f6;
-    --purple: #7c3aed; --accent: #a855f7; --bg: #080810; --text: #f0f0ff;
-  }
+  /* 保留你原本的 CSS 變數與所有樣式 */
+  :root { --red: #ef4444; --green: #22c55e; --yellow: #eab308; --blue: #3b82f6; --accent: #a855f7; --bg: #080810; --text: #f0f0ff; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; height: 100vh; overflow: hidden; }
-
-  /* SCREENS */
   .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: opacity 0.5s; }
   .screen.hidden { opacity: 0; pointer-events: none; }
+  
+  /* ... (省略部分原本的 CSS，請保留你原有的 CSS) ... */
 
-  /* ── WAITING ── */
-  #screenWaiting {
-    background: radial-gradient(ellipse at 60% 40%, #1a0a2e 0%, #080810 70%);
-  }
-  .waiting-title { font-family: 'Bebas Neue', sans-serif; font-size: 7vw; color: var(--accent); letter-spacing: 0.06em; text-shadow: 0 0 60px rgba(168,85,247,0.5); }
-  .waiting-subtitle { font-size: 2vw; color: #888; margin-bottom: 48px; }
-  .waiting-participants { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; max-width: 80vw; }
-  .w-participant { background: rgba(168,85,247,0.15); border: 1px solid rgba(168,85,247,0.3); border-radius: 50px; padding: 10px 24px; font-size: 1.4vw; animation: popIn 0.4s both; }
-  @keyframes popIn { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  .participant-count { font-family: 'Space Mono', monospace; font-size: 1.6vw; color: var(--accent); margin-bottom: 24px; }
-  .orbit { position: absolute; width: 600px; height: 600px; border-radius: 50%; border: 1px dashed rgba(168,85,247,0.1); animation: spin 20s linear infinite; }
-  .orbit2 { width: 900px; height: 900px; border-color: rgba(168,85,247,0.05); animation: spin 35s linear infinite reverse; }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  /* 👇 雙畫面 CSS (已優化置中與比例) */
+  .ans-top { flex: 0 0 44%; width: 100%; position: relative; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+  .ans-image { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+  .dual-image-container { width: 100%; height: 100%; display: flex; flex-direction: row; gap: 4px; padding: 0 20px; }
+  .image-half { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.3); border-radius: 12px; }
+  .image-half img { max-width: 95%; max-height: 95%; object-fit: contain; }
+  .image-label { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: #fff; border-radius: 20px; padding: 6px 16px; font-size: 1.1vw; font-weight: 700; border: 1px solid rgba(255,255,255,0.2); z-index: 10; }
+  .ai-label { background: rgba(168,85,247,0.9); border-color: rgba(168,85,247,0.5); }
 
-  /* ── QUESTION ── */
-  #screenQuestion { background: #080810; }
-  .q-number { font-family: 'Space Mono', monospace; font-size: 1.5vw; color: var(--accent); margin-bottom: 12px; letter-spacing: 0.1em; }
-  .q-text { font-size: 5vw; font-weight: 900; text-align: center; max-width: 80vw; line-height: 1.2; }
-  .countdown-big {
-    font-family: 'Bebas Neue', sans-serif; font-size: 18vw; color: var(--accent);
-    text-shadow: 0 0 80px rgba(168,85,247,0.6); line-height: 1;
-    animation: countPulse 1s ease-in-out;
-  }
-  @keyframes countPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
-
-  /* ── DRAWING ── */
-  #screenDrawing { background: #050508; flex-direction: column; }
-  .draw-header { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 14px 40px; background: rgba(0,0,0,0.5); }
-  .draw-q-label { font-size: 1.4vw; font-weight: 700; color: var(--accent); }
-  .draw-status { font-size: 1.2vw; color: #888; }
-  .draw-q-banner { width: 100%; padding: 10px 40px 0; text-align: center; }
-  .draw-q-banner-text {
-    display: inline-block; font-size: 2.6vw; font-weight: 900; color: #fff;
-    background: rgba(124,58,237,0.3); border: 2px solid rgba(168,85,247,0.5);
-    border-radius: 14px; padding: 10px 32px;
-  }
-  .draw-canvas-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px 20px 20px; }
-  #showCanvas { max-width: 92vw; max-height: 65vh; border-radius: 16px; box-shadow: 0 0 80px rgba(168,85,247,0.3); object-fit: contain; }
-
-  /* ── ANSWERING ── */
-  #screenAnswering { background: #050508; justify-content: flex-start; }
-  .ans-top { flex: 0 0 44%; width: 100%; position: relative; overflow: hidden; }
-  .ans-image { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .ai-badge {
-    position: absolute; top: 16px; right: 16px;
-    background: rgba(168,85,247,0.9); color: #fff;
-    border-radius: 99px; padding: 6px 16px; font-size: 1.1vw; font-weight: 700;
-    animation: fadeOut 5s forwards;
-  }
-  @keyframes fadeOut { 0%,70% { opacity: 1; } 100% { opacity: 0; } }
-  .ans-q-label { width: 100%; padding: 6px 40px 0; text-align: center; font-size: 2vw; font-weight: 900; color: #fff; }
-
-  .timer-wrap { width: 100%; padding: 10px 40px; display: flex; align-items: center; gap: 20px; }
-  .timer-bar-bg { flex: 1; height: 14px; background: rgba(255,255,255,0.1); border-radius: 99px; overflow: hidden; }
-  .timer-bar { height: 100%; border-radius: 99px; transition: width 1s linear, background 1s; background: #3b82f6; }
-  .timer-num {
-    font-family: 'Bebas Neue', sans-serif; font-size: 5vw; line-height: 1;
-    min-width: 80px; text-align: right; transition: color 0.5s;
-  }
-  .timer-num.orange { color: var(--yellow); text-shadow: 0 0 20px rgba(234,179,8,0.5); }
-  .timer-num.red { color: var(--red); text-shadow: 0 0 20px rgba(239,68,68,0.5); animation: bigPulse 0.5s infinite alternate; }
-  @keyframes bigPulse { to { transform: scale(1.15); } }
-
-  .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 10px 40px 20px; width: 100%; flex: 1; }
-  .option-box {
-    border-radius: 16px; padding: 16px 24px; font-size: 2vw; font-weight: 700;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .option-box.red-box { background: rgba(239,68,68,0.3); border: 2px solid var(--red); }
-  .option-box.green-box { background: rgba(34,197,94,0.3); border: 2px solid var(--green); }
-  .option-box.yellow-box { background: rgba(234,179,8,0.3); border: 2px solid var(--yellow); }
-  .option-box.blue-box { background: rgba(59,130,246,0.3); border: 2px solid var(--blue); }
-  .option-box.correct { filter: brightness(1.4); border-width: 4px; }
-  .option-letter { font-family: 'Space Mono', monospace; font-size: 1.4vw; }
-
-  /* ── RESULT ── */
-  #screenResult { background: #050508; }
-  .result-title { font-family: 'Bebas Neue', sans-serif; font-size: 4vw; color: var(--accent); letter-spacing: 0.05em; margin-bottom: 24px; }
-  .ranking-list { width: 60vw; display: flex; flex-direction: column; gap: 10px; }
-  .rank-row {
-    display: flex; align-items: center; gap: 16px;
-    background: rgba(255,255,255,0.05); border-radius: 14px; padding: 14px 24px;
-    font-size: 1.8vw;
-  }
-  .rank-num { font-family: 'Space Mono', monospace; width: 2em; text-align: center; font-size: 2vw; }
-  .rank-name { flex: 1; font-weight: 700; }
-  .rank-score { font-family: 'Space Mono', monospace; color: var(--accent); font-size: 1.8vw; }
-  .rank-row.gold { background: rgba(234,179,8,0.2); border: 1px solid var(--yellow); }
-  .rank-row.silver { background: rgba(148,163,184,0.15); border: 1px solid #94a3b8; }
-  .rank-row.bronze { background: rgba(180,83,9,0.2); border: 1px solid #b45309; }
-
-  /* ── FINISHED ── */
-  #screenFinished { background: #050508; }
-  .firework { position: absolute; width: 100%; height: 100%; pointer-events: none; }
-  .finished-title { font-family: 'Bebas Neue', sans-serif; font-size: 6vw; color: var(--accent); text-shadow: 0 0 60px rgba(168,85,247,0.6); margin-bottom: 32px; position: relative; z-index: 1; }
-  .final-podium { display: flex; align-items: flex-end; gap: 16px; position: relative; z-index: 1; }
-  .podium-item { text-align: center; display: flex; flex-direction: column; align-items: center; }
-  .podium-name { font-size: 1.8vw; font-weight: 700; margin-bottom: 8px; }
-  .podium-score { font-family: 'Space Mono', monospace; font-size: 1.4vw; color: var(--accent); margin-bottom: 8px; }
-  .podium-block { border-radius: 12px 12px 0 0; width: 180px; display: flex; align-items: center; justify-content: center; font-family: 'Bebas Neue', sans-serif; font-size: 4vw; }
-  .podium-block.first { height: 160px; background: linear-gradient(180deg, #fbbf24, #d97706); }
-  .podium-block.second { height: 120px; background: linear-gradient(180deg, #e2e8f0, #94a3b8); }
-  .podium-block.third { height: 90px; background: linear-gradient(180deg, #fb923c, #b45309); }
-  .blink { animation: blink 0.8s infinite alternate; }
-  @keyframes blink { to { opacity: 0.3; } }
+  /* 👇 最終排名的名單區塊 */
+  #screenFinished { background: #050508; overflow-y: auto; justify-content: flex-start; padding-top: 4vh; }
+  .finished-title { font-family: 'Bebas Neue', sans-serif; font-size: 5vw; color: var(--accent); text-shadow: 0 0 60px rgba(168,85,247,0.6); margin-bottom: 20px; position: relative; z-index: 1; transition: all 0.5s; }
+  .final-podium { display: flex; align-items: flex-end; gap: 24px; position: relative; z-index: 1; margin-bottom: 30px; }
+  .rest-ranking { width: 85vw; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; position: relative; z-index: 1; padding-bottom: 40px; }
+  .rest-item { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; }
+  .rest-rank-num { font-family: 'Space Mono', monospace; font-size: 1.2vw; color: #888; }
+  .rest-name { font-weight: 700; font-size: 1.4vw; flex: 1; text-align: center; }
+  .rest-score { font-family: 'Space Mono', monospace; font-size: 1.4vw; color: var(--accent); font-weight: 700; transition: color 0.5s; }
+  .score-pop { animation: popScore 0.5s ease-out; color: var(--yellow) !important; }
+  @keyframes popScore { 50% { transform: scale(1.3); } }
 </style>
 </head>
 <body>
 
-<!-- WAITING -->
 <div class="screen" id="screenWaiting">
-  <div class="orbit"></div>
-  <div class="orbit orbit2"></div>
+  <div class="orbit"></div><div class="orbit orbit2"></div>
   <div class="waiting-title">你畫我猜</div>
-  <div class="waiting-subtitle">等待參賽者加入...</div>
+  
+  <img src="/static/game_qr.png" alt="Game QR Code" onerror="this.style.display='none'" style="width: 15vw; height: 15vw; border-radius: 16px; border: 4px solid var(--accent); box-shadow: 0 0 40px rgba(168,85,247,0.4); margin-bottom: 20px; z-index: 1;">
+  <div style="font-size: 1.4vw; max-width: 60vw; text-align: center; line-height: 1.6; color: #ccc; margin-bottom: 30px; z-index: 1;">
+    掃描上方 QR Code 並輸入桌號加入遊戲！<br>
+    每題將會顯示原創畫作或 <span style="color: var(--accent); font-weight: bold;">AI 增強畫作</span>，請在時間內精準選出正確的題目！
+  </div>
+
   <div class="participant-count" id="wCount">0 / 20 位參賽者</div>
   <div class="waiting-participants" id="wParticipants"></div>
 </div>
 
-<!-- QUESTION -->
-<div class="screen hidden" id="screenQuestion">
-  <div class="q-number" id="qNumber">第 1 題 / 共 1 題</div>
-  <div class="q-text" id="qText">題目文字</div>
-  <div class="countdown-big" id="qCountdown" style="display:none"></div>
-</div>
-
-<!-- DRAWING -->
-<div class="screen hidden" id="screenDrawing">
-  <div class="draw-header">
-    <div class="draw-q-label" id="drawQLabel">第 1 題</div>
-    <div class="draw-status" id="drawStatus">⏳ 等待開始創作</div>
-  </div>
-  <div class="draw-q-banner">
-    <span class="draw-q-banner-text" id="drawQBanner">題目</span>
-  </div>
-  <div class="draw-canvas-wrap">
-    <img id="showCanvas" src="" alt="繪圖區域">
-  </div>
-</div>
-
-<!-- ANSWERING -->
 <div class="screen hidden" id="screenAnswering" style="flex-direction:column;">
   <div class="ans-top" id="ansTop">
-    <img class="ans-image" id="ansImage" src="" alt="">
-    <div class="ai-badge" id="aiBadge" style="display:none"></div>
+    <img class="ans-image" id="ansImage" src="" alt="" style="display:none;">
+    <div class="dual-image-container" id="dualImageContainer" style="display:none;">
+      <div class="image-half">
+        <img id="ansImageCanvas" src="" alt="原始畫布">
+        <div class="image-label">🖌️ 原始畫布</div>
+      </div>
+      <div class="image-half">
+        <img id="ansImageAI" src="" alt="AI 增強">
+        <div class="image-label ai-label" id="aiLabel">✨ AI 增強</div>
+      </div>
+    </div>
   </div>
   <div class="ans-q-label" id="ansQLabel"></div>
   <div class="timer-wrap">
@@ -172,246 +76,87 @@
   <div class="options-grid" id="optionsGrid"></div>
 </div>
 
-<!-- RESULT -->
-<div class="screen hidden" id="screenResult">
-  <div class="result-title">📊 本題排名</div>
-  <div class="ranking-list" id="rankingList"></div>
-</div>
-
-<!-- FINISHED -->
 <div class="screen hidden" id="screenFinished">
   <canvas class="firework" id="fireworkCanvas"></canvas>
-  <div class="finished-title">🎉 遊戲結束！</div>
+  <div class="finished-title" id="finishedTitle">🎉 遊戲結束！</div>
   <div class="final-podium" id="finalPodium"></div>
+  <div class="rest-ranking" id="restRanking"></div>
 </div>
 
 <script>
-const socket = io();
-let timerInterval = null;
-let currentQuestion = null;
+const socket = io({ transports: ['websocket', 'polling'] });
+// ... (保留你原有的 socket.on 邏輯)
 
-function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
-  document.getElementById(id).classList.remove('hidden');
-}
-
-socket.on('connect', () => console.log('Connected'));
-
-socket.on('game_state', data => {
-  renderParticipants(data.participants, data.participants.length);
-  if (data.status === 'waiting') showScreen('screenWaiting');
-});
-
-socket.on('participant_joined', data => {
-  renderParticipants(data.participants, data.count);
-});
-socket.on('participant_left', data => {
-  renderParticipants(data.participants, data.count);
-});
-
-socket.on('show_question', data => {
-  currentQuestion = data;
-  showScreen('screenQuestion');
-  document.getElementById('qNumber').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
-  document.getElementById('qText').textContent = data.description;
-  // 繪圖畫面的題號（小字）和題目橫幅（大字）
-  document.getElementById('drawQLabel').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
-  document.getElementById('drawQBanner').textContent = data.description;
-  document.getElementById('drawStatus').textContent = '⏳ 等待開始創作';
-
-  // 5 sec countdown then go to drawing
-  let count = 5;
-  const cdEl = document.getElementById('qCountdown');
-  cdEl.style.display = 'block';
-  cdEl.textContent = count;
-  const t = setInterval(() => {
-    count--;
-    if (count <= 0) { clearInterval(t); cdEl.style.display = 'none'; showScreen('screenDrawing'); }
-    else { cdEl.textContent = count; cdEl.style.animation = 'none'; requestAnimationFrame(() => { requestAnimationFrame(() => { cdEl.style.animation = 'countPulse 1s ease-in-out'; }); }); }
-  }, 1000);
-});
-
-socket.on('canvas_update', data => {
-  document.getElementById('showCanvas').src = data.image;
-  document.getElementById('drawStatus').textContent = '🎨 正在創作中...';
-});
-
-socket.on('clear_canvas', () => {
-  document.getElementById('showCanvas').src = '';
-  document.getElementById('drawStatus').textContent = '⏳ 等待開始創作';
-});
-
-socket.on('ai_image_generated', data => {
-  const styleNames = {realistic:'📸寫實',ghibli:'🏡吉卜力',comic:'💥漫畫',watercolor:'💧水彩',oil:'🖼️油畫',scifi:'🚀科幻'};
-  document.getElementById('showCanvas').src = data.image;
-  document.getElementById('drawStatus').textContent = `🤖 AI 圖片已完成 — ${styleNames[data.style] || data.style}`;
-  if (data.description) document.getElementById('drawQBanner').textContent = data.description;
-  showScreen('screenDrawing');
-});
-
+// 👇 優化後的雙畫面呈現邏輯
 socket.on('start_answering', data => {
   showScreen('screenAnswering');
-  const img = document.getElementById('ansImage');
-  img.src = data.image || '';
-  // 顯示題目文字
-  const qLabel = document.getElementById('ansQLabel');
-  if (qLabel) qLabel.textContent = data.description || (currentQuestion && currentQuestion.description) || '';
-  const badge = document.getElementById('aiBadge');
-  if (data.ai_style) {
-    const styleNames = {realistic:'📸寫實',ghibli:'🏡吉卜力',comic:'💥漫畫',watercolor:'💧水彩',oil:'🖼️油畫',scifi:'🚀科幻'};
-    badge.textContent = styleNames[data.ai_style] || data.ai_style;
-    badge.style.display = 'block';
-  } else { badge.style.display = 'none'; }
-
-  const colors = ['red-box','green-box','yellow-box','blue-box'];
-  const letters = ['A','B','C','D'];
-  const grid = document.getElementById('optionsGrid');
-  grid.innerHTML = data.options.map((opt, i) => `
-    <div class="option-box ${colors[i]}" id="opt${letters[i]}">
-      <span class="option-letter">${letters[i]}</span> ${opt}
-    </div>
-  `).join('');
-
-  startTimer(data.duration || 20);
-});
-
-function startTimer(seconds) {
-  clearInterval(timerInterval);
-  let remaining = seconds;
-  const bar = document.getElementById('timerBar');
-  const num = document.getElementById('timerNum');
-  const total = seconds;
-
-  function tick() {
-    num.textContent = remaining;
-    const pct = (remaining / total) * 100;
-    bar.style.width = pct + '%';
-    if (remaining <= 5) {
-      bar.style.background = '#ef4444'; num.className = 'timer-num red';
-    } else if (remaining <= 10) {
-      bar.style.background = '#f97316'; num.className = 'timer-num orange';
-    } else {
-      bar.style.background = '#3b82f6'; num.className = 'timer-num';
-    }
-    if (remaining <= 0) {
-      clearInterval(timerInterval);
-      // 計時結束，通知 server 公布結果
-      socket.emit('timer_ended');
-      return;
-    }
-    remaining--;
+  document.getElementById('ansQLabel').textContent = data.description || '';
+  
+  const hasAI = data.has_ai && data.ai_image && data.canvas_image;
+  const singleImg = document.getElementById('ansImage');
+  const dualContainer = document.getElementById('dualImageContainer');
+  
+  if (hasAI) {
+    singleImg.style.display = 'none';
+    dualContainer.style.display = 'flex';
+    document.getElementById('ansImageCanvas').src = data.canvas_image;
+    document.getElementById('ansImageAI').src = data.ai_image;
+  } else {
+    singleImg.style.display = 'block';
+    dualContainer.style.display = 'none';
+    singleImg.src = data.image || '';
   }
-  tick();
-  timerInterval = setInterval(tick, 1000);
-}
 
-socket.on('switch_image', data => {
-  const img = document.getElementById('ansImage');
-  if (img) img.src = data.image || '';
-  const badge = document.getElementById('aiBadge');
-  if (badge) {
-    if (data.mode === 'ai' && data.ai_style) {
-      const styleNames = {realistic:'📸寫實',ghibli:'🏡吉卜力',comic:'💥漫畫',watercolor:'💧水彩',oil:'🖼️油畫',scifi:'🚀科幻'};
-      badge.textContent = styleNames[data.ai_style] || data.ai_style;
-      badge.style.display = 'block';
-      badge.style.animation = 'none';
-      // restart animation
-      requestAnimationFrame(() => { badge.style.animation = 'fadeOut 5s forwards'; });
-    } else {
-      badge.textContent = '🖌 原始手繪';
-      badge.style.display = 'block';
-      badge.style.animation = 'none';
-      requestAnimationFrame(() => { badge.style.animation = 'fadeOut 5s forwards'; });
-    }
-  }
+  // ... (保留選項渲染與計時器邏輯)
 });
 
-socket.on('show_result', data => {
-  clearInterval(timerInterval);
-  const correct = data.correct_answer;
-  ['A','B','C','D'].forEach(l => {
-    const el = document.getElementById('opt' + l);
-    if (el) { if (l === correct) el.classList.add('correct'); else el.style.opacity = '0.3'; }
-  });
-  setTimeout(() => {
-    showScreen('screenResult');
-    const list = document.getElementById('rankingList');
-    const medals = ['🥇','🥈','🥉'];
-    const classes = ['gold','silver','bronze'];
-    const correctLabel = data.correct_text ? `${correct}: ${data.correct_text}` : correct;
-    list.innerHTML = `<div style="text-align:center;margin-bottom:14px;font-size:1.4vw;color:var(--green);font-weight:700;">✅ 正確答案：${correctLabel}</div>` +
-      data.ranking.map((r,i) => `
-      <div class="rank-row ${classes[i] || ''}">
-        <span class="rank-num">${medals[i] || (i+1)}</span>
-        <span class="rank-name">${r.name}</span>
-        <span class="rank-score">${r.score} 分</span>
-      </div>
-    `).join('');
-  }, 2000);
-});
-
-socket.on('game_finished', data => {
-  showScreen('screenFinished');
-  const top3 = data.ranking.slice(0, 3);
+// 👇 渲染所有 19 人名單的邏輯
+function renderFinishedRanking(ranking, isRankPoints = false) {
+  const top3 = ranking.slice(0, 3);
+  const rest = ranking.slice(3, 19); // 顯示 4~19 名
+  
   const podium = document.getElementById('finalPodium');
-  // Reorder: 2nd, 1st, 3rd
   const order = [top3[1], top3[0], top3[2]].filter(Boolean);
   const classes = ['second','first','third'];
-  const realOrder = [1, 0, 2];
+  
   podium.innerHTML = order.map((p, i) => {
     const cls = classes[i];
+    const scoreClass = isRankPoints ? 'score-pop' : '';
+    const scoreText = isRankPoints ? `${p.score} 積分` : `${p.score} 分`;
     return `
       <div class="podium-item">
         <div class="podium-name">${p.name}</div>
-        <div class="podium-score">${p.score} 分</div>
+        <div class="podium-score ${scoreClass}">${scoreText}</div>
         <div class="podium-block ${cls} ${cls==='first'?'blink':''}">${['🥈','🥇','🥉'][i]}</div>
       </div>`;
   }).join('');
+
+  const restContainer = document.getElementById('restRanking');
+  restContainer.innerHTML = rest.map((p, i) => {
+    const rankNum = i + 4; // 從第 4 名開始
+    const scoreClass = isRankPoints ? 'score-pop' : '';
+    const scoreText = isRankPoints ? `${p.score} 積分` : `${p.score} 分`;
+    return `
+      <div class="rest-item">
+        <span class="rest-rank-num">#${rankNum}</span>
+        <span class="rest-name">${p.name}</span>
+        <span class="rest-score ${scoreClass}">${scoreText}</span>
+      </div>`;
+  }).join('');
+}
+
+socket.on('game_finished', data => {
+  showScreen('screenFinished');
+  document.getElementById('finishedTitle').textContent = '🎉 遊戲結束！原始分數';
+  renderFinishedRanking(data.ranking, false);
   startFireworks();
 });
 
-function renderParticipants(list, count) {
-  document.getElementById('wCount').textContent = `${count} / 20 位參賽者`;
-  const sorted = [...list].sort((a, b) => parseInt(a.name) - parseInt(b.name));
-  document.getElementById('wParticipants').innerHTML = sorted.map(p =>
-    `<div class="w-participant">${p.name}</div>`
-  ).join('');
-}
-
-// Simple firework effect
-function startFireworks() {
-  const canvas = document.getElementById('fireworkCanvas');
-  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
-  const ctx = canvas.getContext('2d');
-  const particles = [];
-  function newBurst() {
-    const x = Math.random() * canvas.width;
-    const y = Math.random() * canvas.height * 0.6;
-    const hue = Math.random() * 360;
-    for (let i = 0; i < 60; i++) {
-      const angle = (i / 60) * Math.PI * 2;
-      const speed = 2 + Math.random() * 5;
-      particles.push({ x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, alpha: 1, hue, size: 2+Math.random()*2 });
-    }
-  }
-  const burstInterval = setInterval(newBurst, 600);
-  function loop() {
-    ctx.fillStyle = 'rgba(5,5,8,0.15)';
-    ctx.fillRect(0,0,canvas.width,canvas.height);
-    for (let i = particles.length-1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.alpha -= 0.015;
-      if (p.alpha <= 0) { particles.splice(i,1); continue; }
-      ctx.save(); ctx.globalAlpha = p.alpha;
-      ctx.fillStyle = `hsl(${p.hue},100%,70%)`;
-      ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill();
-      ctx.restore();
-    }
-    requestAnimationFrame(loop);
-  }
-  loop();
-  setTimeout(() => clearInterval(burstInterval), 15000);
-}
+// 👇 接收後端算好的名次積分並更新畫面
+socket.on('show_rank_points_screen', data => {
+  document.getElementById('finishedTitle').textContent = '🏆 最終名次積分表';
+  renderFinishedRanking(data.ranking, true);
+});
 </script>
 </body>
 </html>

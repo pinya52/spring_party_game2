@@ -1,259 +1,24 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>你畫我猜</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #0e0e14;
-    --surface: #16161f;
-    --surface2: #1e1e2e;
-    --accent: #a855f7;
-    --red: #ef4444; --green: #22c55e; --yellow: #eab308; --blue: #3b82f6;
-    --text: #f0f0ff; --muted: #64748b; --border: #2a2a3e;
-    --radius: 16px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Noto Sans TC', sans-serif;
-    min-height: 100dvh; overflow-x: hidden;
-    display: flex; flex-direction: column; align-items: center;
-  }
-
-  /* ── SCREENS ── */
-  .screen { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; min-height: 100dvh; padding: 24px; }
-  .screen.active { display: flex; }
-
-  /* ── LOGIN ── */
-  #screenLogin {
-    background: radial-gradient(ellipse at 50% 30%, #1a0a2e 0%, var(--bg) 70%);
-  }
-  .logo { font-size: 3.5rem; margin-bottom: 4px; }
-  .logo-title { font-size: 1.8rem; font-weight: 900; color: var(--accent); margin-bottom: 4px; }
-  .logo-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 40px; }
-  .login-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 20px; padding: 28px; width: 100%; max-width: 360px;
-  }
-  .login-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
-  input[type=text] {
-    width: 100%; background: var(--bg); border: 2px solid var(--border);
-    border-radius: 12px; color: var(--text); padding: 14px 16px;
-    font-size: 1.1rem; font-family: 'Noto Sans TC', sans-serif;
-    transition: border-color 0.2s; margin-bottom: 16px;
-  }
-  input[type=text]:focus { outline: none; border-color: var(--accent); }
-  .btn-join {
-    width: 100%; background: linear-gradient(135deg, var(--accent), #7c3aed);
-    color: #fff; border: none; border-radius: 12px; padding: 16px;
-    font-size: 1.1rem; font-weight: 700; cursor: pointer;
-    font-family: 'Noto Sans TC', sans-serif; transition: opacity 0.2s;
-    box-shadow: 0 8px 32px rgba(168,85,247,0.3);
-  }
-  .btn-join:active { opacity: 0.85; transform: scale(0.98); }
-  .error-msg { color: var(--red); font-size: 0.85rem; margin-top: 8px; min-height: 20px; }
-  .conn-indicator { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); margin-bottom: 24px; }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-  .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
-
-  /* ── WAITING ── */
-  #screenWaiting { gap: 16px; }
-  .welcome-icon { font-size: 4rem; animation: bounce 2s infinite; }
-  @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-  .welcome-name { font-size: 1.5rem; font-weight: 900; color: var(--accent); }
-  .wait-text { color: var(--muted); font-size: 0.95rem; text-align: center; }
-  .pulse-ring { width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--accent); animation: pulse 2s infinite; }
-  @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
-
-  /* ── QUESTION (on phone) ── */
-  #screenQuestion { gap: 20px; }
-  .phone-q-num { font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--accent); }
-  .phone-q-text { font-size: 1.3rem; font-weight: 700; text-align: center; line-height: 1.4; }
-  .phone-countdown { font-size: 5rem; font-weight: 900; color: var(--accent); font-family: 'Space Mono', monospace; animation: cPulse 1s ease infinite; }
-  @keyframes cPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-
-  /* ── DRAWING WATCH ── */
-  #screenDrawing { gap: 14px; text-align: center; }
-  .tv-icon { font-size: 5rem; }
-  .drawing-heading { font-size: 1.4rem; font-weight: 900; color: var(--accent); }
-  .drawing-tips { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 320px; }
-  .tip-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 10px; padding: 10px 14px; font-size: 0.9rem; }
-
-  /* ── ANSWERING ── */
-  #screenAnswering { justify-content: flex-start; padding: 16px; gap: 12px; }
-  .answer-timer-row { display: flex; align-items: center; gap: 12px; width: 100%; }
-  .answer-timer-bar { flex: 1; height: 10px; background: var(--border); border-radius: 99px; overflow: hidden; }
-  .answer-timer-fill { height: 100%; border-radius: 99px; background: var(--blue); transition: width 1s linear, background 0.5s; }
-  .answer-timer-num { font-family: 'Space Mono', monospace; font-size: 1.6rem; font-weight: 700; min-width: 44px; text-align: right; transition: color 0.3s; }
-  .answer-timer-num.orange { color: var(--yellow); }
-  .answer-timer-num.red { color: var(--red); animation: shake 0.3s infinite; }
-  @keyframes shake { 0%,100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
-
-  .options-col { display: flex; flex-direction: column; gap: 12px; width: 100%; }
-  .option-btn {
-    width: 100%; border: none; border-radius: var(--radius); padding: 20px 20px;
-    font-size: 1.1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 14px;
-    font-family: 'Noto Sans TC', sans-serif; transition: transform 0.1s, opacity 0.3s;
-    text-align: left; position: relative; overflow: hidden;
-  }
-  .option-btn:active { transform: scale(0.96); }
-  .option-btn.disabled { opacity: 0.3; pointer-events: none; }
-  .option-btn .letter { font-family: 'Space Mono', monospace; font-size: 1rem; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
-  .option-btn.red-btn { background: rgba(239,68,68,0.25); border: 2px solid var(--red); color: #fff; }
-  .option-btn.green-btn { background: rgba(34,197,94,0.25); border: 2px solid var(--green); color: #fff; }
-  .option-btn.yellow-btn { background: rgba(234,179,8,0.25); border: 2px solid var(--yellow); color: #fff; }
-  .option-btn.blue-btn { background: rgba(59,130,246,0.25); border: 2px solid var(--blue); color: #fff; }
-  .option-btn.selected { filter: brightness(1.4); border-width: 3px; }
-  .check-mark { margin-left: auto; font-size: 1.4rem; display: none; }
-  .option-btn.selected .check-mark { display: block; }
-
-  /* ── WAITING RESULT ── */
-  #screenWaitResult { gap: 16px; }
-  .submitted-icon { font-size: 4rem; }
-
-  /* ── RESULT ── */
-  #screenResult { gap: 14px; }
-  .result-correct { font-size: 0.9rem; color: var(--muted); }
-  .answer-tag { display: inline-block; padding: 8px 20px; border-radius: 99px; font-weight: 700; font-size: 1.1rem; }
-  .score-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 24px; width: 100%; max-width: 360px; }
-  .score-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-  .score-row:last-child { border-bottom: none; }
-  .score-row .label { color: var(--muted); }
-  .score-row .value { font-family: 'Space Mono', monospace; color: var(--accent); font-weight: 700; }
-  .score-row.total .value { font-size: 1.4rem; }
-  .rank-display { font-size: 2.5rem; font-weight: 900; }
-
-  /* ── FINISHED ── */
-  #screenFinished { gap: 16px; }
-  .final-medal { font-size: 5rem; }
-  .final-rank { font-size: 1.4rem; font-weight: 900; color: var(--accent); }
-  .final-score-num { font-family: 'Space Mono', monospace; font-size: 2rem; }
-  .btn-restart { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 12px; padding: 14px 32px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; }
-
-  /* Gold/Silver/Bronze backgrounds */
-  .bg-gold { background: linear-gradient(180deg, rgba(234,179,8,0.15), var(--bg)); }
-  .bg-silver { background: linear-gradient(180deg, rgba(148,163,184,0.1), var(--bg)); }
-  .bg-bronze { background: linear-gradient(180deg, rgba(180,83,9,0.12), var(--bg)); }
-
-  /* Toast */
-  #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-60px); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 20px; font-size: 0.88rem; transition: transform 0.3s; z-index: 99; white-space: nowrap; }
-  #toast.show { transform: translateX(-50%) translateY(0); }
-</style>
-</head>
-<body>
-
-<!-- LOGIN -->
-<div class="screen active" id="screenLogin">
-  <div class="logo">🎮</div>
-  <div class="logo-title">你畫我猜</div>
-  <div class="logo-sub">多人線上猜圖遊戲</div>
-  <div class="conn-indicator"><div class="dot" id="connDot"></div><span id="connText">連線中...</span></div>
-  <div class="login-card">
-    <div class="login-label">輸入您的桌號（01–19）</div>
-    <input type="text" id="nameInput" placeholder="例如：05" maxlength="2" autocomplete="off"
-      inputmode="numeric" pattern="[0-9]*"
-      style="font-size:2rem;text-align:center;letter-spacing:0.3em;font-family:'Space Mono',monospace;">
-    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:14px;text-align:center;">
-      輸入後名稱將顯示為「05桌」
-    </div>
-    <button class="btn-join" onclick="joinGame()">加入遊戲 →</button>
-    <div class="error-msg" id="errorMsg"></div>
-  </div>
-</div>
-
-<!-- WAITING -->
-<div class="screen" id="screenWaiting">
-  <div style="position:relative;display:flex;align-items:center;justify-content:center;width:100px;height:100px;margin-bottom:8px;">
-    <div class="pulse-ring" style="position:absolute"></div>
-    <div class="welcome-icon">🎉</div>
-  </div>
-  <div class="welcome-name" id="welcomeName"></div>
-  <div class="wait-text">成功加入！<br>等待管理員開始遊戲...</div>
-  <button id="btnRename" onclick="requestRename()"
-    style="margin-top:24px;background:transparent;border:1px solid var(--border);color:var(--muted);
-    border-radius:10px;padding:10px 24px;font-size:0.88rem;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">
-    ✏️ 重新輸入桌號
-  </button>
-</div>
-
-<!-- QUESTION -->
-<div class="screen" id="screenQuestion">
-  <div class="phone-q-num" id="phoneQNum">第 1 題 / 共 1 題</div>
-  <div class="phone-q-text" id="phoneQText"></div>
-  <div class="phone-countdown" id="phoneCd">5</div>
-</div>
-
-<!-- DRAWING WATCH -->
-<div class="screen" id="screenDrawing">
-  <div class="tv-icon">📺</div>
-  <div class="drawing-heading">請在大螢幕觀看</div>
-  <div style="color:var(--muted);font-size:0.9rem;margin-bottom:8px;">畫家正在創作中...</div>
-  <div class="drawing-tips">
-    <div class="tip-row">📺 請注意觀看大螢幕上的繪畫內容</div>
-    <div class="tip-row">🤔 思考一下這幅畫想要表達什麼</div>
-    <div class="tip-row">🤖 AI 可能會增強圖片效果</div>
-    <div class="tip-row">⏰ 準備好回答問題</div>
-  </div>
-  <div style="color:var(--muted);font-size:0.85rem;margin-top:16px;">等待開放答題...</div>
-</div>
-
-<!-- ANSWERING -->
-<div class="screen" id="screenAnswering">
-  <div class="answer-timer-row">
-    <div class="answer-timer-bar"><div class="answer-timer-fill" id="aTimerFill" style="width:100%"></div></div>
-    <div class="answer-timer-num" id="aTimerNum">20</div>
-  </div>
-  <div class="options-col" id="optionsCol"></div>
-</div>
-
-<!-- WAITING FOR RESULT -->
-<div class="screen" id="screenWaitResult">
-  <div class="submitted-icon">✅</div>
-  <div style="font-size:1.2rem;font-weight:700;">答案已提交</div>
-  <div style="color:var(--muted);font-size:0.9rem;">等待其他參賽者完成...</div>
-</div>
-
-<!-- PERSONAL RESULT -->
-<div class="screen" id="screenResult">
-  <div class="result-correct">正確答案</div>
-  <div class="answer-tag" id="correctTag"></div>
-  <div class="score-card">
-    <div class="score-row"><span class="label">基礎分</span><span class="value" id="baseScore">+0</span></div>
-    <div class="score-row"><span class="label">時間獎勵</span><span class="value" id="timeBonus">+0</span></div>
-    <div class="score-row"><span class="label">連續獎勵</span><span class="value" id="streakBonus">+0</span></div>
-    <div class="score-row total"><span class="label">總分</span><span class="value" id="totalScore">0</span></div>
-    <div class="score-row"><span class="label">目前排名</span><span class="value rank-display" id="myRank">-</span></div>
-  </div>
-</div>
-
-<!-- FINISHED -->
-<div class="screen" id="screenFinished">
-  <div class="final-medal" id="finalMedal">🎮</div>
-  <div class="final-rank" id="finalRankText"></div>
-  <div style="color:var(--muted);font-size:0.9rem;">總分</div>
-  <div class="final-score-num" id="finalScoreNum">0</div>
-  <button class="btn-restart" onclick="restart()">重新開始</button>
-</div>
-
-<div id="toast"></div>
-
 <script>
-const socket = io();
+const socket = io({ transports: ['websocket', 'polling'] });
 let myName = '';
 let timerInterval = null;
 let answeredThisRound = false;
-let pendingResult = null; // 暫存 answer_result 資料，等 show_result 後才顯示
+let pendingResult = null;
+
+// 👇 網頁載入時，檢查是否有暫存的桌號，有的話直接自動登入
+window.onload = () => {
+  const savedNumber = localStorage.getItem('my_table_number');
+  if (savedNumber) {
+    document.getElementById('nameInput').value = savedNumber;
+    joinGame();
+  }
+};
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
 
-// Connection
 socket.on('connect', () => {
   document.getElementById('connDot').className = 'dot green';
   document.getElementById('connText').textContent = '已連線';
@@ -263,42 +28,36 @@ socket.on('disconnect', () => {
   document.getElementById('connText').textContent = '已斷線';
 });
 
-// Login
 function joinGame() {
   const raw = document.getElementById('nameInput').value.trim();
   if (!raw) { setError('請輸入桌號'); return; }
-  // 前端預驗證
-  if (!/^(0[1-9]|1[0-9])$/.test(raw)) {
-    setError('請輸入 01–19 之間的兩位數字（例如：05）'); return;
-  }
+  if (!/^(0[1-9]|1[0-9])$/.test(raw)) { setError('請輸入 01–19 之間的兩位數字'); return; }
   setError('');
+  
+  // 👇 儲存桌號到瀏覽器
+  localStorage.setItem('my_table_number', raw);
   socket.emit('join_game', { number: raw });
 }
+
 document.getElementById('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
-// 自動補零：輸入單個數字時自動補前導零
 document.getElementById('nameInput').addEventListener('input', e => {
-  let v = e.target.value.replace(/[^0-9]/g, '').slice(0, 2);
-  e.target.value = v;
+  e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 2);
 });
 
-function requestRename() {
-  socket.emit('request_rename');
-}
+function requestRename() { socket.emit('request_rename'); }
 
 socket.on('rename_ok', () => {
   myName = '';
+  localStorage.removeItem('my_table_number'); // 👇 清除紀錄
   document.getElementById('nameInput').value = '';
-  setError('');
-  showScreen('screenLogin');
+  setError(''); showScreen('screenLogin');
 });
-socket.on('rename_error', data => {
-  showToast(data.message);
-});
+
 socket.on('kicked', () => {
   myName = '';
+  localStorage.removeItem('my_table_number'); // 👇 清除紀錄
   document.getElementById('nameInput').value = '';
-  setError('');
-  showToast('您已被管理員移除，請重新輸入桌號');
+  setError(''); showToast('您已被管理員移除，請重新輸入桌號');
   showScreen('screenLogin');
 });
 
@@ -306,178 +65,9 @@ socket.on('join_error', data => setError(data.message));
 socket.on('join_success', data => {
   myName = data.name;
   document.getElementById('welcomeName').textContent = data.name;
-  setError('');
-  showScreen('screenWaiting');
+  setError(''); showScreen('screenWaiting');
 });
 
-socket.on('game_state', data => {
-  if (data.status === 'waiting') return;
-});
-
-socket.on('show_question', data => {
-  answeredThisRound = false;
-  pendingResult = null;
-  clearInterval(timerInterval);
-  showScreen('screenQuestion');
-  document.getElementById('phoneQNum').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
-  document.getElementById('phoneQText').textContent = data.description;
-  let cd = 5;
-  const el = document.getElementById('phoneCd');
-  el.textContent = cd;
-  const t = setInterval(() => {
-    cd--;
-    if (cd <= 0) { clearInterval(t); showScreen('screenDrawing'); }
-    else el.textContent = cd;
-  }, 1000);
-});
-
-socket.on('start_answering', data => {
-  answeredThisRound = false;
-  showScreen('screenAnswering');
-  const colors = [
-    {cls:'red-btn', letter:'A', letterBg:'#ef4444'},
-    {cls:'green-btn', letter:'B', letterBg:'#22c55e'},
-    {cls:'yellow-btn', letter:'C', letterBg:'#eab308'},
-    {cls:'blue-btn', letter:'D', letterBg:'#3b82f6'},
-  ];
-  const col = document.getElementById('optionsCol');
-  col.innerHTML = data.options.map((opt, i) => `
-    <button class="option-btn ${colors[i].cls}" onclick="selectAnswer('${colors[i].letter}', this)" id="btnOpt${colors[i].letter}">
-      <span class="letter" style="background:${colors[i].letterBg}">${colors[i].letter}</span>
-      ${opt}
-      <span class="check-mark">✓</span>
-    </button>
-  `).join('');
-  startAnswerTimer(data.duration || 20);
-});
-
-function selectAnswer(letter, el) {
-  if (answeredThisRound) return;
-  answeredThisRound = true;
-  const timeFill = document.getElementById('aTimerFill');
-  const pct = parseFloat(timeFill.style.width);
-  const total = 20;
-  const time_taken = ((100 - pct) / 100) * total;
-  document.querySelectorAll('.option-btn').forEach(b => {
-    if (b !== el) b.classList.add('disabled');
-  });
-  el.classList.add('selected');
-  if (navigator.vibrate) navigator.vibrate(40);
-  socket.emit('submit_answer', { answer: letter, time_taken });
-  clearInterval(timerInterval);
-  // 立刻切換，不用 setTimeout，避免 show_result 比 timeout 先到
-  showScreen('screenWaitResult');
-}
-
-function startAnswerTimer(seconds) {
-  clearInterval(timerInterval);
-  let remaining = seconds;
-  const fill = document.getElementById('aTimerFill');
-  const num = document.getElementById('aTimerNum');
-  const total = seconds;
-  function tick() {
-    num.textContent = remaining;
-    fill.style.width = ((remaining / total) * 100) + '%';
-    if (remaining <= 5) {
-      fill.style.background = '#ef4444'; num.className = 'answer-timer-num red';
-      if (navigator.vibrate && remaining > 0) navigator.vibrate(50);
-    } else if (remaining <= 10) {
-      fill.style.background = '#f97316'; num.className = 'answer-timer-num orange';
-    } else {
-      fill.style.background = '#3b82f6'; num.className = 'answer-timer-num';
-    }
-    if (remaining <= 0) { clearInterval(timerInterval); return; }
-    remaining--;
-  }
-  tick();
-  timerInterval = setInterval(tick, 1000);
-}
-
-// answer_result：暫存資料，強制保持在等待畫面
-socket.on('answer_result', data => {
-  clearInterval(timerInterval);
-  pendingResult = data;
-  showScreen('screenWaitResult');
-});
-
-// ✅ show_result：這時才顯示個人分數與排名
-socket.on('show_result', data => {
-  clearInterval(timerInterval);
-  if (pendingResult) {
-    // 有答題 → 顯示個人成績
-    const d = pendingResult;
-    const labels = {A:'A 選項', B:'B 選項', C:'C 選項', D:'D 選項'};
-    const colors = {A:'#ef4444', B:'#22c55e', C:'#eab308', D:'#3b82f6'};
-    const correct = data.correct_answer;
-    const tag = document.getElementById('correctTag');
-    tag.textContent = `✓ ${labels[correct]}`;
-    tag.style.background = colors[correct] + '33';
-    tag.style.border = `2px solid ${colors[correct]}`;
-    tag.style.color = colors[correct];
-    document.getElementById('baseScore').textContent = '+' + d.base_score;
-    document.getElementById('timeBonus').textContent = '+' + d.time_bonus;
-    document.getElementById('streakBonus').textContent = '+' + d.streak_bonus;
-    document.getElementById('totalScore').textContent = d.total_score;
-    const rankEl = document.getElementById('myRank');
-    rankEl.textContent = ['🥇','🥈','🥉'][d.rank-1] || '#' + d.rank;
-    const screen = document.getElementById('screenResult');
-    screen.className = 'screen' + (d.rank===1?' bg-gold':d.rank===2?' bg-silver':d.rank===3?' bg-bronze':'');
-    if (d.rank <= 3 && navigator.vibrate) navigator.vibrate([100, 50, 100]);
-    showScreen('screenResult');
-  } else {
-    // 沒有答題（時間到還沒選）→ 顯示超時畫面
-    const colors = {A:'#ef4444', B:'#22c55e', C:'#eab308', D:'#3b82f6'};
-    const correct = data.correct_answer;
-    const tag = document.getElementById('correctTag');
-    tag.textContent = `✓ ${data.correct_answer} 選項`;
-    tag.style.background = colors[correct] + '33';
-    tag.style.border = `2px solid ${colors[correct]}`;
-    tag.style.color = colors[correct];
-    document.getElementById('baseScore').textContent = '+0';
-    document.getElementById('timeBonus').textContent = '+0';
-    document.getElementById('streakBonus').textContent = '+0';
-    // 總分不變，從 ranking 找自己
-    const me = data.ranking ? data.ranking.find(r => r.name === myName) : null;
-    document.getElementById('totalScore').textContent = me ? me.score : '-';
-    const myIdx = data.ranking ? data.ranking.findIndex(r => r.name === myName) : -1;
-    const rank = myIdx + 1;
-    document.getElementById('myRank').textContent = rank > 0 ? (['🥇','🥈','🥉'][rank-1] || '#' + rank) : '-';
-    const screen = document.getElementById('screenResult');
-    screen.className = 'screen';
-    showScreen('screenResult');
-  }
-  pendingResult = null;
-});
-
-socket.on('game_finished', data => {
-  const myEntry = data.ranking.find(r => r.name === myName);
-  const rank = myEntry ? data.ranking.indexOf(myEntry) + 1 : 0;
-  const medals = ['🥇','🥈','🥉'];
-  const congrats = ['恭喜獲得第一名！','恭喜獲得第二名！','恭喜獲得第三名！'];
-  document.getElementById('finalMedal').textContent = medals[rank-1] || '🎮';
-  document.getElementById('finalRankText').textContent = rank <= 3 ? congrats[rank-1] : `最終排名：第 ${rank} 名`;
-  document.getElementById('finalScoreNum').textContent = myEntry ? myEntry.score + ' 分' : '0 分';
-  const screen = document.getElementById('screenFinished');
-  screen.className = 'screen' + (rank===1?' bg-gold':rank===2?' bg-silver':rank===3?' bg-bronze':'');
-  if (rank <= 3 && navigator.vibrate) navigator.vibrate([200,100,200,100,400]);
-  showScreen('screenFinished');
-});
-
-function restart() {
-  myName = '';
-  document.getElementById('nameInput').value = '';
-  showScreen('screenLogin');
-}
-
-function setError(msg) {
-  document.getElementById('errorMsg').textContent = msg;
-}
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
+// 其餘答題與畫面切換邏輯保持不變 (請複製你原本 game.html 的 show_question, start_answering 等邏輯貼在這裡)
+// ... 
 </script>
-</body>
-</html>

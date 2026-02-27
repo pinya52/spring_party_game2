@@ -5,719 +5,375 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>管理員控制台 — 你畫我猜</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0e0e14;
-    --surface: #16161f;
-    --surface2: #1e1e2e;
-    --accent: #7c3aed;
-    --accent2: #a855f7;
-    --green: #22c55e;
-    --red: #ef4444;
-    --orange: #f97316;
-    --yellow: #eab308;
-    --text: #e2e8f0;
-    --muted: #64748b;
-    --border: #2a2a3e;
-    --radius: 12px;
+    --bg: #0f172a; --surface: #1e293b; --primary: #3b82f6; --accent: #a855f7;
+    --red: #ef4444; --green: #22c55e; --yellow: #eab308; --text: #f8fafc;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; min-height: 100vh; }
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; display: flex; height: 100vh; overflow: hidden; }
   
-  header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 16px 24px;
-    display: flex; align-items: center; gap: 16px;
-  }
-  header h1 { font-size: 1.4rem; font-weight: 900; }
-  header h1 span { color: var(--accent2); }
-  .badge { background: var(--accent); color: #fff; font-size: 0.7rem; padding: 3px 8px; border-radius: 99px; font-family: 'Space Mono', monospace; }
+  /* 左側控制面板 */
+  .panel { width: 360px; background: var(--surface); padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; border-right: 1px solid #334155; }
+  .panel-title { font-size: 1.5rem; font-weight: 900; color: var(--accent); display: flex; align-items: center; justify-content: space-between; }
   
-  .layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; height: calc(100vh - 57px); overflow: hidden; }
+  .card { background: rgba(0,0,0,0.2); border: 1px solid #334155; border-radius: 12px; padding: 16px; }
+  .card-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 12px; color: #cbd5e1; }
   
-  .sidebar {
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    overflow-y: auto;
-    padding: 20px;
-    display: flex; flex-direction: column; gap: 20px;
-  }
+  .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; color: #fff; transition: opacity 0.2s; margin-bottom: 8px; }
+  .btn:hover { opacity: 0.9; }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   
-  .main { overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 20px; }
+  .btn-primary { background: var(--primary); }
+  .btn-accent { background: var(--accent); }
+  .btn-success { background: var(--green); }
+  .btn-danger { background: var(--red); }
+  .btn-warning { background: var(--yellow); color: #000; }
+  .btn-outline { background: transparent; border: 1px solid #64748b; }
   
-  .card {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 18px;
-  }
-  .card-title {
-    font-size: 0.8rem; font-weight: 700; letter-spacing: 0.1em;
-    color: var(--muted); text-transform: uppercase; margin-bottom: 14px;
-    font-family: 'Space Mono', monospace;
-  }
-  
-  /* Buttons */
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 10px 18px; border-radius: 8px; border: none; cursor: pointer;
-    font-family: 'Noto Sans TC', sans-serif; font-weight: 700; font-size: 0.9rem;
-    transition: all 0.15s; white-space: nowrap;
-  }
-  .btn-primary { background: var(--accent); color: #fff; }
-  .btn-primary:hover { background: var(--accent2); transform: translateY(-1px); }
-  .btn-green { background: var(--green); color: #fff; }
-  .btn-green:hover { filter: brightness(1.15); }
-  .btn-orange { background: var(--orange); color: #fff; }
-  .btn-orange:hover { filter: brightness(1.15); }
-  .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
-  .btn-ghost:hover { background: var(--surface); color: var(--text); }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
-  
-  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
-  
-  /* Form */
-  input, textarea, select {
-    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
-    color: var(--text); padding: 9px 12px; font-family: 'Noto Sans TC', sans-serif;
-    font-size: 0.9rem; width: 100%; transition: border-color 0.15s;
-  }
-  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent2); }
-  label { font-size: 0.82rem; color: var(--muted); margin-bottom: 4px; display: block; }
-  .form-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-  
-  /* Status */
-  .status-pill {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 99px; padding: 4px 12px; font-size: 0.8rem;
-    font-family: 'Space Mono', monospace;
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-  .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
-  .dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
-  
-  /* Participants */
-  .participant-list { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
-  .participant-item {
-    display: flex; justify-content: space-between; align-items: center;
-    background: var(--bg); border-radius: 8px; padding: 8px 12px; font-size: 0.85rem;
-  }
-  .participant-item .score { color: var(--accent2); font-family: 'Space Mono', monospace; font-weight: 700; }
-  
-  /* Canvas */
-  #drawCanvas {
-    display: block; border-radius: 10px; border: 2px solid var(--border);
-    cursor: crosshair; background: #fff; width: 100%; max-width: 100%;
-    touch-action: none;
-  }
-  .canvas-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-  .tool-group { display: flex; align-items: center; gap: 6px; }
-  .color-swatch {
-    width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
-    border: 3px solid transparent; transition: border-color 0.15s;
-  }
-  .color-swatch.active { border-color: var(--accent2); }
-  #colorPicker { width: 36px; height: 36px; padding: 2px; border-radius: 6px; cursor: pointer; }
-  #brushSize { width: 80px; }
-  
-  /* AI styles */
-  .ai-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
-  .ai-style-btn {
-    background: var(--bg); border: 2px solid var(--border); border-radius: 10px;
-    padding: 10px 8px; text-align: center; cursor: pointer; transition: all 0.15s;
-    font-size: 0.8rem; color: var(--text);
-  }
-  .ai-style-btn:hover { border-color: var(--accent); }
-  .ai-style-btn.selected { border-color: var(--accent2); background: rgba(168,85,247,0.1); }
-  .ai-style-btn .emoji { font-size: 1.4rem; display: block; margin-bottom: 4px; }
-  
-  /* AI preview */
-  #aiPreview { max-width: 100%; border-radius: 10px; border: 2px solid var(--accent); margin-top: 10px; display: none; }
-  
-  /* Questions */
-  .q-item {
-    background: var(--bg); border-radius: 8px; padding: 10px 14px;
-    margin-bottom: 8px; font-size: 0.85rem; border-left: 3px solid var(--accent);
-  }
-  .q-item .q-desc { font-weight: 700; margin-bottom: 4px; }
-  .q-item .q-options { color: var(--muted); font-size: 0.78rem; }
-  
-  /* Progress bar */
-  .progress-bar { background: var(--border); border-radius: 99px; height: 8px; overflow: hidden; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 99px; transition: width 0.3s; }
-  
-  /* Tabs */
-  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-  .tab { padding: 8px 16px; border-radius: 8px 8px 0 0; cursor: pointer; font-size: 0.85rem; color: var(--muted); border-bottom: 2px solid transparent; transition: all 0.15s; }
-  .tab.active { color: var(--accent2); border-bottom-color: var(--accent2); }
-  .tab-panel { display: none; }
-  .tab-panel.active { display: block; }
-  
-  /* Toast */
-  #toast {
-    position: fixed; bottom: 24px; right: 24px;
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 10px; padding: 12px 20px; font-size: 0.88rem;
-    transform: translateY(80px); opacity: 0; transition: all 0.3s;
-    z-index: 999; max-width: 300px;
-  }
-  #toast.show { transform: translateY(0); opacity: 1; }
-  #toast.success { border-color: var(--green); color: var(--green); }
-  #toast.error { border-color: var(--red); color: var(--red); }
+  /* 遊戲控制區按鈕群 */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-  .answer-progress { font-family: 'Space Mono', monospace; font-size: 1.1rem; color: var(--accent2); text-align: center; padding: 8px; }
+  /* 參賽者列表 */
+  .player-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
+  .player-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; }
+  .kick-btn { background: rgba(239,68,68,0.2); color: var(--red); border: 1px solid var(--red); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8rem; }
+
+  /* 右側繪圖區 */
+  .workspace { flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 20px; }
+  .toolbar { display: flex; align-items: center; gap: 16px; background: var(--surface); padding: 16px; border-radius: 12px; }
+  .tool-group { display: flex; align-items: center; gap: 8px; }
+  
+  .color-btn { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+  .color-btn.active { border-color: #fff; transform: scale(1.1); }
+  input[type=range] { width: 100px; }
+  select { background: #0f172a; color: #fff; border: 1px solid #334155; padding: 8px; border-radius: 6px; font-size: 1rem; }
+
+  .canvas-container { flex: 1; background: #fff; border-radius: 12px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative; }
+  canvas { cursor: crosshair; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+  
+  #aiLoading { position: absolute; inset: 0; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; align-items: center; justify-content: center; display: none; }
+  .spinner { width: 50px; height: 50px; border: 5px solid rgba(168,85,247,0.3); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .status-badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; background: #334155; }
 </style>
 </head>
 <body>
-<header>
-  <h1>🎮 你畫我猜 <span>Admin</span></h1>
-  <span class="badge">管理員控制台</span>
-  <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
-    <div class="status-pill"><div class="dot" id="connDot"></div><span id="connText">連線中...</span></div>
-    <div class="status-pill">狀態：<strong id="gameStatusText">等待中</strong></div>
+
+<div class="panel">
+  <div class="panel-title">
+    🎮 控制台 <span id="connStatus" class="status-badge" style="background:var(--red)">未連線</span>
   </div>
-</header>
 
-<div class="layout">
-  <!-- Sidebar -->
-  <aside class="sidebar">
-    <!-- 遊戲控制 -->
-    <div class="card">
-      <div class="card-title">🎮 遊戲控制</div>
-      <div class="btn-row" style="margin-bottom:12px;">
-        <button class="btn btn-green" id="btnStart" onclick="startGame()">▶ 開始遊戲</button>
-        <button class="btn btn-orange" id="btnOpen" onclick="openAnswer()" disabled>🔓 開放答題</button>
-      </div>
-      <div class="btn-row" style="margin-bottom:12px;">
-        <button class="btn btn-primary" id="btnResult" onclick="showResult()" disabled>📊 公布結果</button>
-        <button class="btn btn-ghost" id="btnNext" onclick="nextQuestion()" disabled>⏭ 下一題</button>
-      </div>
-      <div id="switchImageRow" style="display:none;margin-bottom:12px;">
-        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:6px;">答題畫面顯示：</div>
-        <div class="btn-row">
-          <button class="btn btn-primary" id="btnShowAI" onclick="switchImage('ai')" style="flex:1;">🤖 AI 圖片</button>
-          <button class="btn btn-ghost" id="btnShowCanvas" onclick="switchImage('canvas')" style="flex:1;">🖌 原始畫布</button>
-        </div>
-      </div>
-      <div id="progressWrap" style="display:none">
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;font-size:0.82rem;color:var(--muted);">
-          <span>題目進度</span><span id="qProgress">0 / 0</span>
-        </div>
-        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
-      </div>
-      <div class="answer-progress" id="answerProgress" style="display:none"></div>
+  <div class="card">
+    <div class="card-title">1. 題目管理</div>
+    <input type="file" id="csvFile" accept=".csv" style="margin-bottom:8px; width:100%; color:#888;">
+    <button class="btn btn-outline" onclick="uploadCSV()">上傳題庫 (CSV)</button>
+    <div id="qStatus" style="font-size:0.85rem; color:var(--green); margin-top:8px;"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">2. 遊戲進度控制</div>
+    <div style="font-size:0.9rem; color:#cbd5e1; margin-bottom:12px;">
+      目前狀態：<span id="gameStatusLabel" style="color:var(--accent); font-weight:700;">等待中</span><br>
+      目前題目：<span id="qProgressLabel">- / -</span>
     </div>
-
-    <!-- 參賽者 -->
-    <div class="card">
-      <div class="card-title">👥 參賽者 (<span id="participantCount">0</span>/20)</div>
-      <div class="participant-list" id="participantList">
-        <div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:16px;">尚無參賽者加入</div>
-      </div>
+    
+    <button class="btn btn-primary" onclick="socket.emit('admin_start_game')">▶️ 開始遊戲 (第一題)</button>
+    <button class="btn btn-success" onclick="socket.emit('admin_open_answer')">🔓 開放手機答題 (20秒)</button>
+    <button class="btn btn-outline" onclick="socket.emit('admin_show_result')">📊 提前公布解答</button>
+    
+    <div class="grid-2" style="margin-top:8px;">
+      <button class="btn btn-accent" onclick="socket.emit('admin_next_question')">⏭️ 下一題</button>
+      <button class="btn btn-warning" onclick="socket.emit('admin_show_rank_points')">🏅 顯示名次積分</button>
     </div>
+  </div>
 
-    <!-- 題目清單 -->
-    <div class="card">
-      <div class="card-title">📋 題目清單 (<span id="qCount">0</span> 題)</div>
-      <div id="questionList" style="max-height:300px;overflow-y:auto;"></div>
+  <div class="card">
+    <div class="card-title">大螢幕顯示切換</div>
+    <div class="grid-2">
+      <button class="btn btn-outline" onclick="socket.emit('admin_switch_image', {mode:'canvas'})">🖌️ 顯示原圖</button>
+      <button class="btn btn-outline" onclick="socket.emit('admin_switch_image', {mode:'ai'})">✨ 顯示 AI 圖</button>
     </div>
-  </aside>
+  </div>
 
-  <!-- Main -->
-  <main class="main">
-    <!-- 題目設定 -->
-    <div class="card">
-      <div class="card-title">📝 題目設定</div>
-      <div class="tabs">
-        <div class="tab active" onclick="switchTab('csv')">CSV 批量導入</div>
-        <div class="tab" onclick="switchTab('manual')">手動新增</div>
-      </div>
+  <div class="card" style="flex:1;">
+    <div class="card-title">參賽者名單 (<span id="pCount">0</span>)</div>
+    <div class="player-list" id="playerList"></div>
+  </div>
 
-      <div class="tab-panel active" id="tab-csv">
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-          <label class="btn btn-ghost" style="cursor:pointer;">
-            📂 選擇 CSV 檔案 <input type="file" accept=".csv" id="csvFile" style="display:none" onchange="loadCSV(this)">
-          </label>
-          <button class="btn btn-ghost" onclick="downloadSampleCSV()">⬇ 下載範例 CSV</button>
-        </div>
-        <div style="font-size:0.8rem;color:var(--muted);">格式：<code style="background:var(--bg);padding:2px 6px;border-radius:4px;">題目敘述,選項A,選項B,選項C,選項D,正確答案(A/B/C/D)</code></div>
-      </div>
-
-      <div class="tab-panel" id="tab-manual">
-        <div class="form-group"><label>題目敘述</label><input type="text" id="qDesc" placeholder="例：這是什麼動物？"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-          <div class="form-group"><label>選項 A</label><input type="text" id="qA" placeholder="選項 A"></div>
-          <div class="form-group"><label>選項 B</label><input type="text" id="qB" placeholder="選項 B"></div>
-          <div class="form-group"><label>選項 C</label><input type="text" id="qC" placeholder="選項 C"></div>
-          <div class="form-group"><label>選項 D</label><input type="text" id="qD" placeholder="選項 D"></div>
-        </div>
-        <div class="form-group">
-          <label>正確答案</label>
-          <select id="qAnswer"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
-        </div>
-        <div class="btn-row">
-          <button class="btn btn-primary" onclick="addQuestion()">➕ 新增題目</button>
-          <button class="btn btn-ghost" onclick="clearQuestions()">🗑 清除所有題目</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 繪圖工具 -->
-    <div class="card">
-      <div class="card-title">🖌 繪圖工具</div>
-      <div class="canvas-tools">
-        <div class="tool-group">
-          <label style="margin:0;font-size:0.8rem;">筆刷</label>
-          <input type="range" id="brushSize" min="1" max="20" value="4" oninput="updateBrush()">
-          <span id="brushVal" style="font-family:'Space Mono';font-size:0.8rem;">4px</span>
-        </div>
-        <div class="tool-group">
-          <input type="color" id="colorPicker" value="#1e1e2e" oninput="updateColor(this.value)">
-        </div>
-        <div class="tool-group" id="swatches">
-          <div class="color-swatch active" style="background:#1e1e2e" onclick="selectColor('#1e1e2e',this)"></div>
-          <div class="color-swatch" style="background:#ef4444" onclick="selectColor('#ef4444',this)"></div>
-          <div class="color-swatch" style="background:#22c55e" onclick="selectColor('#22c55e',this)"></div>
-          <div class="color-swatch" style="background:#3b82f6" onclick="selectColor('#3b82f6',this)"></div>
-          <div class="color-swatch" style="background:#eab308" onclick="selectColor('#eab308',this)"></div>
-          <div class="color-swatch" style="background:#f97316" onclick="selectColor('#f97316',this)"></div>
-          <div class="color-swatch" style="background:#ffffff" onclick="selectColor('#ffffff',this)" style="border:1px solid #444"></div>
-        </div>
-        <button class="btn btn-ghost" onclick="undoStroke()">↩ 復原</button>
-        <button class="btn btn-ghost" onclick="clearCanvas()">🗑 全部清除</button>
-        <button class="btn btn-ghost" onclick="downloadCanvas()">⬇ 下載</button>
-        <button class="btn btn-primary" onclick="broadcastCanvas()">📡 同步畫面</button>
-      </div>
-      <canvas id="drawCanvas" width="800" height="400"></canvas>
-    </div>
-
-    <!-- AI 圖片 -->
-    <div class="card">
-      <div class="card-title">🎨 AI 風格套用</div>
-      <div class="ai-grid" id="aiGrid">
-        <div class="ai-style-btn selected" data-style="realistic" onclick="selectAIStyle(this)">
-          <span class="emoji">📸</span>寫實
-        </div>
-        <div class="ai-style-btn" data-style="ghibli" onclick="selectAIStyle(this)">
-          <span class="emoji">🏡</span>吉卜力
-        </div>
-        <div class="ai-style-btn" data-style="comic" onclick="selectAIStyle(this)">
-          <span class="emoji">💥</span>漫畫
-        </div>
-        <div class="ai-style-btn" data-style="watercolor" onclick="selectAIStyle(this)">
-          <span class="emoji">💧</span>水彩
-        </div>
-        <div class="ai-style-btn" data-style="oil" onclick="selectAIStyle(this)">
-          <span class="emoji">🖼️</span>油畫
-        </div>
-        <div class="ai-style-btn" data-style="scifi" onclick="selectAIStyle(this)">
-          <span class="emoji">🚀</span>科幻
-        </div>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
-        <button class="btn btn-primary" onclick="generateAI()">🎨 套用風格</button>
-        <button class="btn btn-ghost" id="btnDownloadAI" onclick="downloadAI()" disabled>⬇ 下載圖片</button>
-      </div>
-
-      <!-- Stable Diffusion 區塊 -->
-      <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px;">
-        <div class="card-title">🤖 AI 生成圖片（Stable Horde）</div>
-        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;">
-          ✅ 使用 <strong style="color:var(--accent2)">Stable Horde</strong> 免費分散式生成，不需要 Token。約 30-60 秒完成。
-        </div>
-        <button class="btn btn-primary" onclick="generateDiffusion()" id="btnDiffusion">✨ AI 生成圖片</button>
-      </div>
-
-      <img id="aiPreview" alt="AI 預覽">
-    </div>
-  </main>
+  <button class="btn btn-danger" onclick="resetGame()" style="margin-top:auto;">⚠️ 重置整個遊戲</button>
 </div>
 
-<div id="toast"></div>
+<div class="workspace">
+  <div class="toolbar">
+    <div class="tool-group">
+      <div class="color-btn active" style="background:#000" onclick="setColor('#000', this)"></div>
+      <div class="color-btn" style="background:#ef4444" onclick="setColor('#ef4444', this)"></div>
+      <div class="color-btn" style="background:#3b82f6" onclick="setColor('#3b82f6', this)"></div>
+      <div class="color-btn" style="background:#22c55e" onclick="setColor('#22c55e', this)"></div>
+      <div class="color-btn" style="background:#eab308" onclick="setColor('#eab308', this)"></div>
+      <div class="color-btn" style="background:#fff; border:1px solid #ccc;" onclick="setColor('#ffffff', this)" title="橡皮擦"></div>
+    </div>
+    <div style="width:1px; height:24px; background:#334155; margin:0 8px;"></div>
+    <div class="tool-group">
+      <span style="font-size:0.9rem;">粗細</span>
+      <input type="range" id="brushSize" min="2" max="30" value="5">
+    </div>
+    <div style="width:1px; height:24px; background:#334155; margin:0 8px;"></div>
+    <button class="btn btn-outline" style="width:auto; padding:8px 16px; margin:0;" onclick="clearCanvas()">🗑️ 清空畫布</button>
+    
+    <div style="margin-left:auto; display:flex; gap:8px;">
+      <select id="aiStyle">
+        <option value="realistic">📸 寫實照片</option>
+        <option value="ghibli">🏡 吉卜力動畫</option>
+        <option value="comic">💥 熱血漫畫</option>
+        <option value="watercolor">💧 透明水彩</option>
+        <option value="oil">🖼️ 經典油畫</option>
+        <option value="scifi">🚀 賽博龐克</option>
+      </select>
+      <button class="btn btn-accent" style="width:auto; padding:8px 24px; margin:0;" onclick="generateAI()">✨ AI 魔法增強</button>
+    </div>
+  </div>
+
+  <div class="canvas-container" id="canvasWrap">
+    <canvas id="drawingCanvas" width="800" height="600"></canvas>
+    <div id="aiLoading">
+      <div class="spinner"></div>
+      <div style="font-size:1.2rem; font-weight:700;">AI 畫家正在施展魔法，請稍候...</div>
+      <div id="aiLoadingText" style="color:#888; margin-top:8px; font-size:0.9rem;">這可能需要 10~30 秒</div>
+    </div>
+  </div>
+</div>
 
 <script>
-const socket = io();
-let questions = [];
-let selectedStyle = 'realistic';
-let aiImageData = null;
-let gameStatus = 'waiting';
+// 👇 1. 加入雙通道傳輸與防降級設定
+const socket = io({ transports: ['websocket', 'polling'] });
 
-// Canvas
-const canvas = document.getElementById('drawCanvas');
+// --- Socket.IO 連線狀態 ---
+socket.on('connect', () => {
+  const badge = document.getElementById('connStatus');
+  badge.textContent = '已連線'; badge.style.background = 'var(--green)';
+});
+socket.on('disconnect', () => {
+  const badge = document.getElementById('connStatus');
+  badge.textContent = '斷線中'; badge.style.background = 'var(--red)';
+});
+
+// --- 遊戲狀態同步 ---
+socket.on('game_state', data => updateUI(data));
+socket.on('show_question', data => {
+  document.getElementById('gameStatusLabel').textContent = '畫畫中';
+  document.getElementById('qProgressLabel').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
+  clearCanvas(false); // 換題自動清空畫布，不發送廣播避免覆蓋
+});
+socket.on('start_answering', () => document.getElementById('gameStatusLabel').textContent = '答題中');
+socket.on('show_result', () => document.getElementById('gameStatusLabel').textContent = '顯示解答');
+socket.on('game_finished', () => document.getElementById('gameStatusLabel').textContent = '遊戲結束');
+socket.on('game_reset', () => window.location.reload());
+
+socket.on('participant_joined', data => renderPlayers(data.participants));
+socket.on('participant_left', data => renderPlayers(data.participants));
+
+function updateUI(data) {
+  if (data.total_questions) {
+    document.getElementById('qProgressLabel').textContent = `第 ${data.current_question+1} 題 / 共 ${data.total_questions} 題`;
+  }
+  renderPlayers(data.participants || []);
+}
+
+function renderPlayers(list) {
+  document.getElementById('pCount').textContent = list.length;
+  const sorted = [...list].sort((a, b) => parseInt(a.name) - parseInt(b.name));
+  document.getElementById('playerList').innerHTML = sorted.map(p => `
+    <div class="player-item">
+      <span>${p.name} ${p.online===false ? '<span style="color:var(--red);font-size:0.8em">(離線)</span>':''}</span>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <span style="font-family:monospace; color:var(--accent);">${p.score}分</span>
+        <button class="kick-btn" onclick="kickPlayer('${p.name}')">踢出</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function kickPlayer(name) {
+  if (confirm(`確定要踢出 ${name} 嗎？`)) socket.emit('admin_kick', {name});
+}
+
+// --- CSV 題庫解析 ---
+function uploadCSV() {
+  const file = document.getElementById('csvFile').files[0];
+  if (!file) return alert('請先選擇 CSV 檔案');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    // 假設格式: 題目描述, 選項A, 選項B, 選項C, 選項D, 正確解答代號(A/B/C/D)
+    // 略過第一行標題
+    const questions = [];
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(',').map(p => p.trim());
+      if (parts.length >= 6) {
+        questions.push({
+          description: parts[0],
+          options: [parts[1], parts[2], parts[3], parts[4]],
+          correct: parts[5].toUpperCase()
+        });
+      }
+    }
+    if (questions.length === 0) return alert('解析失敗，請確認 CSV 格式是否正確');
+    
+    fetch('/api/upload_questions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ questions })
+    }).then(r => r.json()).then(res => {
+      if (res.success) {
+        document.getElementById('qStatus').textContent = `✅ 成功載入 ${res.count} 題！`;
+      } else { alert(res.error); }
+    });
+  };
+  reader.readAsText(file);
+}
+
+function resetGame() {
+  if (confirm('⚠️ 警告：這將會清除所有玩家的分數並強制所有人重新登入！確定要重置嗎？')) {
+    fetch('/api/reset', { method:'POST' });
+  }
+}
+
+// --- 畫布與繪圖邏輯 (加入節流與壓縮) ---
+const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
+let isDrawing = false;
+let currentX = 0; let currentY = 0;
+let brushColor = '#000000';
+let brushSize = 5;
+
+// 👇 2. 宣告節流時間變數
+let lastEmitTime = 0;
+
+// 初始化畫布白底
 ctx.fillStyle = '#ffffff';
 ctx.fillRect(0, 0, canvas.width, canvas.height);
-let drawing = false;
-let lastX = 0, lastY = 0;
-let currentColor = '#1e1e2e';
-let brushSize = 4;
-let broadcastTimer = null;
-let strokeHistory = [];  // 每筆結束後存快照
 
-function saveSnapshot() {
-  strokeHistory.push(canvas.toDataURL());
-  if (strokeHistory.length > 30) strokeHistory.shift(); // 最多保留30步
+function setColor(color, el) {
+  brushColor = color;
+  document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
 }
+document.getElementById('brushSize').addEventListener('input', e => { brushSize = e.target.value; });
 
-function undoStroke() {
-  if (strokeHistory.length === 0) { showToast('沒有可復原的步驟', ''); return; }
-  strokeHistory.pop(); // 移除目前狀態
-  const prev = strokeHistory.length > 0 ? strokeHistory[strokeHistory.length - 1] : null;
-  if (prev) {
-    const img2 = new Image();
-    img2.onload = () => { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.drawImage(img2,0,0); scheduleBroadcast(); };
-    img2.src = prev;
-  } else {
-    // 回到空白
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    scheduleBroadcast();
+function clearCanvas(broadcast = true) {
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (broadcast) {
+    socket.emit('clear_canvas');
+    emitCanvas();
   }
 }
 
+// 取得正確座標 (處理 CSS 縮放)
 function getPos(e) {
-  const r = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / r.width;
-  const scaleY = canvas.height / r.height;
-  if (e.touches) {
-    return [(e.touches[0].clientX - r.left) * scaleX, (e.touches[0].clientY - r.top) * scaleY];
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  let clientX = e.clientX; let clientY = e.clientY;
+  if (e.touches && e.touches.length > 0) {
+    clientX = e.touches[0].clientX; clientY = e.touches[0].clientY;
   }
-  return [(e.clientX - r.left) * scaleX, (e.clientY - r.top) * scaleY];
+  return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
 }
 
-canvas.addEventListener('mousedown', e => { drawing = true; [lastX, lastY] = getPos(e); });
-canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; [lastX, lastY] = getPos(e); }, {passive:false});
-canvas.addEventListener('mousemove', draw);
-canvas.addEventListener('touchmove', e => { e.preventDefault(); draw(e); }, {passive:false});
-canvas.addEventListener('mouseup', () => { drawing = false; saveSnapshot(); scheduleBroadcast(); });
-canvas.addEventListener('touchend', () => { drawing = false; saveSnapshot(); scheduleBroadcast(); });
+function startDraw(e) {
+  e.preventDefault();
+  isDrawing = true;
+  const pos = getPos(e);
+  currentX = pos.x; currentY = pos.y;
+  ctx.beginPath();
+  ctx.fillStyle = brushColor;
+  ctx.arc(currentX, currentY, brushSize/2, 0, Math.PI*2);
+  ctx.fill();
+}
 
 function draw(e) {
-  if (!drawing) return;
-  const [x, y] = getPos(e);
+  if (!isDrawing) return;
+  e.preventDefault();
+  const pos = getPos(e);
   ctx.beginPath();
-  ctx.moveTo(lastX, lastY);
-  ctx.lineTo(x, y);
-  ctx.strokeStyle = currentColor;
+  ctx.moveTo(currentX, currentY);
+  ctx.lineTo(pos.x, pos.y);
+  ctx.strokeStyle = brushColor;
   ctx.lineWidth = brushSize;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.stroke();
-  [lastX, lastY] = [x, y];
-}
+  currentX = pos.x; currentY = pos.y;
 
-function scheduleBroadcast() {
-  clearTimeout(broadcastTimer);
-  broadcastTimer = setTimeout(broadcastCanvas, 300);
-}
-
-function broadcastCanvas() {
-  const img = canvas.toDataURL('image/png');
-  socket.emit('drawing_update', { image: img });
-}
-
-function clearCanvas() {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  broadcastCanvas();
-}
-
-function downloadCanvas() {
-  const a = document.createElement('a'); a.href = canvas.toDataURL(); a.download = 'drawing.png'; a.click();
-}
-
-function updateBrush() {
-  brushSize = parseInt(document.getElementById('brushSize').value);
-  document.getElementById('brushVal').textContent = brushSize + 'px';
-}
-
-function updateColor(c) { currentColor = c; }
-function selectColor(c, el) {
-  currentColor = c;
-  document.getElementById('colorPicker').value = c;
-  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
-  el.classList.add('active');
-}
-
-// AI
-function selectAIStyle(el) {
-  document.querySelectorAll('.ai-style-btn').forEach(b => b.classList.remove('selected'));
-  el.classList.add('selected');
-  selectedStyle = el.dataset.style;
-}
-
-async function generateAI() {
-  const img = canvas.toDataURL('image/png');
-  showToast('正在生成 AI 圖片...', '');
-  try {
-    const res = await fetch('/api/process_image', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ image: img, style: selectedStyle })
-    });
-    const data = await res.json();
-    if (data.success) {
-      aiImageData = data.image;
-      const preview = document.getElementById('aiPreview');
-      preview.src = data.image; preview.style.display = 'block';
-      document.getElementById('btnDownloadAI').disabled = false;
-      document.getElementById('btnOpen').disabled = false;
-      showToast('AI 圖片生成完成！', 'success');
-      _showSwitchRow('ai');
-    } else { showToast(data.error || '生成失敗', 'error'); }
-  } catch(e) { showToast('網路錯誤', 'error'); }
-}
-
-async function generateDiffusion() {
-  const img = canvas.toDataURL('image/png');
-  const btn = document.getElementById('btnDiffusion');
-  btn.disabled = true;
-  btn.textContent = '⏳ 生成中（約30-60秒）...';
-  showToast('正在生成 AI 圖片（風格：' + selectedStyle + '）...', '');
-  try {
-    const res = await fetch('/api/diffusion', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ image: img, style: selectedStyle })
-    });
-    const rawText = await res.text();
-    let data;
-    try {
-      data = JSON.parse(rawText);
-    } catch(e) {
-      showToast('伺服器錯誤 (HTTP ' + res.status + ')：' + rawText.slice(0, 120), 'error');
-      console.error('Server response:', rawText);
-      return;
-    }
-    if (data.success) {
-      aiImageData = data.image;
-      const preview = document.getElementById('aiPreview');
-      preview.src = data.image; preview.style.display = 'block';
-      document.getElementById('btnDownloadAI').disabled = false;
-      document.getElementById('btnOpen').disabled = false;
-      showToast('AI 圖片生成完成！', 'success');
-      _showSwitchRow('ai');
-    } else { showToast('生成失敗：' + (data.error || '未知錯誤'), 'error'); console.error('API error:', data); }
-  } catch(e) { showToast('網路錯誤：' + e.message, 'error'); console.error('Fetch error:', e); }
-  finally {
-    btn.disabled = false;
-    btn.textContent = '✨ AI 生成圖片';
+  // 👇 3. 節流邏輯：每 100 毫秒才發送一次，避免塞爆伺服器
+  const now = Date.now();
+  if (now - lastEmitTime > 100) {
+    emitCanvas();
+    lastEmitTime = now;
   }
 }
 
-function downloadAI() {
-  if (!aiImageData) return;
-  const a = document.createElement('a'); a.href = aiImageData; a.download = 'ai_image.png'; a.click();
+function endDraw(e) {
+  if (!isDrawing) return;
+  isDrawing = false;
+  // 👇 4. 畫筆離開時，無條件補發最後一次完整畫面
+  emitCanvas();
 }
 
-// Questions
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['csv','manual'][i] === name));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('tab-' + name).classList.add('active');
+// 滑鼠事件
+canvas.addEventListener('mousedown', startDraw);
+canvas.addEventListener('mousemove', draw);
+canvas.addEventListener('mouseup', endDraw);
+canvas.addEventListener('mouseout', endDraw);
+// 觸控事件
+canvas.addEventListener('touchstart', startDraw, {passive:false});
+canvas.addEventListener('touchmove', draw, {passive:false});
+canvas.addEventListener('touchend', endDraw);
+
+// 👇 5. 畫布壓縮：使用 image/webp 並將畫質設為 0.5
+function emitCanvas() {
+  const dataURL = canvas.toDataURL('image/webp', 0.5);
+  socket.emit('drawing_update', { image: dataURL });
 }
 
-function loadCSV(input) {
-  const file = input.files[0]; if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const lines = e.target.result.split('\n').filter(l => l.trim());
-    const newQs = [];
-    for (const line of lines) {
-      const parts = line.split(',').map(s => s.trim());
-      if (parts.length < 6) continue;
-      newQs.push({ description: parts[0], options: [parts[1],parts[2],parts[3],parts[4]], correct: parts[5].toUpperCase() });
+// --- 呼叫 AI 生成圖片 ---
+async function generateAI() {
+  const loading = document.getElementById('aiLoading');
+  const style = document.getElementById('aiStyle').value;
+  
+  // 為了給 AI 較好的辨識，這張圖用 jpeg 高畫質送出
+  const dataURL = canvas.toDataURL('image/jpeg', 0.8);
+  
+  loading.style.display = 'flex';
+  document.getElementById('aiLoadingText').textContent = '這可能需要幾秒鐘到一分鐘不等...';
+
+  try {
+    const response = await fetch('/api/diffusion', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataURL, style: style })
+    });
+    const result = await response.json();
+    
+    if (result.error) {
+      alert('產生失敗：' + result.error);
+    } else {
+      // 成功產生，後端會自動廣播 ai_image_generated 給 show.html
+      // 管理員畫面也可以切換顯示
     }
-    questions = [...questions, ...newQs].slice(0, 50);
-    uploadQuestions();
-    renderQuestions();
-    showToast(`已載入 ${newQs.length} 題`, 'success');
-  };
-  reader.readAsText(file, 'UTF-8');
-}
-
-function downloadSampleCSV() {
-  const csv = '這隻動物有長鼻子,大象,河馬,犀牛,長頸鹿,A\n這種水果是黃色的,蘋果,香蕉,西瓜,葡萄,B\n';
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = 'sample.csv'; a.click();
-}
-
-function addQuestion() {
-  const desc = document.getElementById('qDesc').value.trim();
-  const A = document.getElementById('qA').value.trim();
-  const B = document.getElementById('qB').value.trim();
-  const C = document.getElementById('qC').value.trim();
-  const D = document.getElementById('qD').value.trim();
-  const ans = document.getElementById('qAnswer').value;
-  if (!desc || !A || !B || !C || !D) { showToast('請填寫所有欄位', 'error'); return; }
-  if (questions.length >= 50) { showToast('題目已達上限 50 題', 'error'); return; }
-  questions.push({ description: desc, options: [A,B,C,D], correct: ans });
-  uploadQuestions(); renderQuestions();
-  ['qDesc','qA','qB','qC','qD'].forEach(id => document.getElementById(id).value = '');
-  showToast('題目已新增', 'success');
-}
-
-function clearQuestions() {
-  if (!confirm('確定要清除所有題目？')) return;
-  questions = []; uploadQuestions(); renderQuestions();
-}
-
-async function uploadQuestions() {
-  await fetch('/api/upload_questions', {
-    method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ questions })
-  });
-}
-
-function renderQuestions() {
-  const list = document.getElementById('questionList');
-  const count = document.getElementById('qCount');
-  count.textContent = questions.length;
-  if (!questions.length) { list.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:12px;">尚無題目</div>'; return; }
-  list.innerHTML = questions.map((q,i) => `
-    <div class="q-item">
-      <div class="q-desc">${i+1}. ${q.description}</div>
-      <div class="q-options">A:${q.options[0]} B:${q.options[1]} C:${q.options[2]} D:${q.options[3]} ✓${q.correct}</div>
-    </div>
-  `).join('');
-}
-
-// Game controls
-function startGame() {
-  if (!questions.length) { showToast('請先設定題目', 'error'); return; }
-  socket.emit('admin_start_game');
-}
-function openAnswer() { socket.emit('admin_open_answer'); }
-function _showSwitchRow(defaultMode) {
-  document.getElementById('switchImageRow').style.display = 'block';
-  document.getElementById('btnShowAI').className = 'btn ' + (defaultMode === 'ai' ? 'btn-primary' : 'btn-ghost');
-  document.getElementById('btnShowCanvas').className = 'btn ' + (defaultMode === 'canvas' ? 'btn-primary' : 'btn-ghost');
-}
-
-function switchImage(mode) {
-  socket.emit('admin_switch_image', { mode });
-  document.getElementById('btnShowAI').className = 'btn ' + (mode === 'ai' ? 'btn-primary' : 'btn-ghost');
-  document.getElementById('btnShowCanvas').className = 'btn ' + (mode === 'canvas' ? 'btn-primary' : 'btn-ghost');
-  showToast(mode === 'ai' ? '切換為 AI 圖片' : '切換為原始畫布', 'success');
-}
-function showResult() { socket.emit('admin_show_result'); }
-function nextQuestion() {
-  // ✅ 清空畫布後才送出下一題
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  broadcastCanvas();
-  aiImageData = null;
-  document.getElementById('aiPreview').style.display = 'none';
-  document.getElementById('btnDownloadAI').disabled = true;
-  socket.emit('admin_next_question');
-}
-
-// Socket events
-socket.on('connect', () => {
-  document.getElementById('connDot').className = 'dot green';
-  document.getElementById('connText').textContent = '已連線';
-});
-socket.on('disconnect', () => {
-  document.getElementById('connDot').className = 'dot';
-  document.getElementById('connText').textContent = '已斷線';
-});
-
-socket.on('participant_joined', data => {
-  renderParticipants(data.participants, data.count);
-});
-socket.on('participant_left', data => {
-  renderParticipants(data.participants, data.participants.length);
-});
-socket.on('game_state', data => {
-  gameStatus = data.status;
-  updateStatus(data.status);
-  renderParticipants(data.participants, data.participants.length);
-});
-socket.on('show_question', data => {
-  document.getElementById('progressWrap').style.display = 'block';
-  document.getElementById('qProgress').textContent = `${data.index+1} / ${data.total}`;
-  document.getElementById('progressFill').style.width = `${((data.index+1)/data.total)*100}%`;
-  document.getElementById('btnOpen').disabled = false;
-  document.getElementById('btnResult').disabled = true;
-  document.getElementById('btnNext').disabled = true;
-  updateStatus('question');
-  // 遊戲開始就顯示切換按鈕，預設顯示畫布
-  _showSwitchRow('canvas');
-});
-socket.on('start_answering', () => {
-  document.getElementById('answerProgress').style.display = 'block';
-  document.getElementById('answerProgress').textContent = '答題中: 0 / ' + Object.keys({}).length;
-  document.getElementById('btnOpen').disabled = true;
-  document.getElementById('btnResult').disabled = false;
-  // 顯示切換按鈕，預設 AI 圖片為 active（若無 AI 圖則預設畫布）
-  _showSwitchRow(aiImageData ? 'ai' : 'canvas');
-  updateStatus('answering');
-});
-socket.on('answer_progress', data => {
-  document.getElementById('answerProgress').textContent = `已答題: ${data.answered} / ${data.total}`;
-});
-socket.on('show_result', () => {
-  document.getElementById('btnNext').disabled = false;
-  document.getElementById('btnResult').disabled = true;
-  document.getElementById('btnOpen').disabled = true;
-  updateStatus('result');
-});
-socket.on('game_finished', () => updateStatus('finished'));
-
-// 下一題時清空畫布
-socket.on('clear_canvas', () => {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  aiImageData = null;
-  document.getElementById('aiPreview').style.display = 'none';
-  document.getElementById('btnDownloadAI').disabled = true;
-  document.getElementById('answerProgress').style.display = 'none';
-  // 重置為畫布模式，但保持按鈕顯示
-  _showSwitchRow('canvas');
-});
-
-function renderParticipants(list, count) {
-  document.getElementById('participantCount').textContent = count;
-  const el = document.getElementById('participantList');
-  if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:0.82rem;text-align:center;padding:16px;">尚無參賽者加入</div>'; return; }
-  const sorted = [...list].sort((a,b) => {
-    // 依桌號數字排序
-    const na = parseInt(a.name); const nb = parseInt(b.name);
-    return na - nb;
-  });
-  el.innerHTML = sorted.map((p,i) => `
-    <div class="participant-item">
-      <span style="font-weight:700;">${p.name}</span>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span class="score">${p.score}</span>
-        ${gameStatus === 'waiting' ? `<button onclick="kickParticipant('${p.name}')" style="background:rgba(239,68,68,0.2);border:1px solid var(--red);color:var(--red);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:0.75rem;">移除</button>` : ''}
-      </div>
-    </div>
-  `).join('');
-}
-
-function kickParticipant(name) {
-  if (!confirm(`確定要移除「${name}」？`)) return;
-  socket.emit('admin_kick', { name });
-}
-
-const statusMap = {
-  waiting:'等待中', started:'開始中', question:'展示題目', drawing:'繪圖中', answering:'答題中', result:'結果公布', finished:'遊戲結束'
-};
-function updateStatus(s) {
-  document.getElementById('gameStatusText').textContent = statusMap[s] || s;
-  document.getElementById('btnStart').disabled = s !== 'waiting';
-}
-
-// Toast
-function showToast(msg, type='') {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.className = 'show ' + type;
-  setTimeout(() => t.className = '', 2800);
+  } catch (err) {
+    alert('發生錯誤：' + err);
+  } finally {
+    loading.style.display = 'none';
+  }
 }
 </script>
 </body>
