@@ -176,6 +176,8 @@
 const socket = io({ transports: ['websocket', 'polling'] });
 let timerInterval = null;
 let currentQuestion = null;
+let lastCanvasImage = '';  // 💡新增：用來暫存原圖
+let lastAIImage = '';      // 💡新增：用來暫存 AI 圖
 
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
@@ -216,16 +218,20 @@ socket.on('show_question', data => {
 });
 
 socket.on('canvas_update', data => {
+  lastCanvasImage = data.image;  // 💡暫存
   document.getElementById('showCanvas').src = data.image;
   document.getElementById('drawStatus').textContent = '🎨 正在創作中...';
 });
 
 socket.on('clear_canvas', () => {
+  lastCanvasImage = '';  // 💡清空
+  lastAIImage = '';      // 💡清空
   document.getElementById('showCanvas').src = '';
   document.getElementById('drawStatus').textContent = '⏳ 等待開始創作';
 });
 
 socket.on('ai_image_generated', data => {
+  lastAIImage = data.image;      // 💡暫存
   const styleNames = {realistic:'📸寫實',ghibli:'🏡吉卜力',comic:'💥漫畫',watercolor:'💧水彩',oil:'🖼️油畫',scifi:'🚀科幻'};
   document.getElementById('showCanvas').src = data.image;
   document.getElementById('drawStatus').textContent = `🤖 AI 圖片已完成 — ${styleNames[data.style] || data.style}`;
@@ -237,19 +243,21 @@ socket.on('start_answering', data => {
   showScreen('screenAnswering');
   document.getElementById('ansQLabel').textContent = data.description || (currentQuestion && currentQuestion.description) || '';
   
-  const hasAI = data.has_ai && data.ai_image && data.canvas_image;
+  const hasAI = data.has_ai; 
   const singleImg = document.getElementById('ansImage');
   const dualContainer = document.getElementById('dualImageContainer');
   
   if (hasAI) {
     singleImg.style.display = 'none';
     dualContainer.style.display = 'flex';
-    document.getElementById('ansImageCanvas').src = data.canvas_image;
-    document.getElementById('ansImageAI').src = data.ai_image;
+    // 💡直接讀取本地暫存，瞬間顯示零延遲
+    document.getElementById('ansImageCanvas').src = lastCanvasImage;
+    document.getElementById('ansImageAI').src = lastAIImage;
   } else {
     singleImg.style.display = 'block';
     dualContainer.style.display = 'none';
-    singleImg.src = data.image || '';
+    // 💡優先顯示 AI 圖，沒有的話顯示原圖
+    singleImg.src = lastAIImage || lastCanvasImage || '';
   }
 
   const colors = ['red-box','green-box','yellow-box','blue-box'];

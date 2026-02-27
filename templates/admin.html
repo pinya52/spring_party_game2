@@ -46,13 +46,14 @@
   input[type=range] { width: 100px; }
   select { background: #0f172a; color: #fff; border: 1px solid #334155; padding: 8px; border-radius: 6px; font-size: 1rem; }
 
-  /* 💡修改：拿掉 width/height 100% 與 object-fit，改用 max-width/height 讓實際邊界與視覺邊界一致 */
   canvas { 
       cursor: crosshair; 
       box-shadow: 0 0 20px rgba(0,0,0,0.5); 
+      width: 100%;
+      height: auto;
       max-width: 100%;
       max-height: 100%;
-      aspect-ratio: 4 / 3; /* 強制保持 800x600 的比例 */
+      aspect-ratio: 4 / 3; 
       border-radius: 12px;
       touch-action: none; 
   }

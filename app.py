@@ -251,6 +251,13 @@ def on_join_game(data):
     name = number + '桌'
     
     if uid in game_state['participants']:
+        # 💡新增：防重複登入機制
+        # 檢查該桌號是否已經存在，且目前為「上線狀態」
+        if game_state['participants'][uid].get('online', False):
+            emit('join_error', {'message': f'此桌號 ({name}) 已有人使用，請重新輸入'})
+            return
+            
+        # 如果是離線狀態（例如玩家剛好重新整理網頁），則允許重新接管該桌號
         game_state['participants'][uid]['sid'] = sid
         game_state['participants'][uid]['online'] = True
     else:
@@ -266,11 +273,11 @@ def on_join_game(data):
         'answered': game_state['participants'][uid]['answered']
     }
     
-    # 💡新增：連線時告訴手機端剩下幾秒
+    # 傳送剩餘時間給手機端
     if game_state['status'] == 'answering':
-        payload['remaining_time'] = max(0, int(game_state['answer_duration'] - (time.time() - game_state.get('answer_start_time', time.time()))))
+        payload['remaining_time'] = max(0, int(game_state.get('answer_duration', 20) - (time.time() - game_state.get('answer_start_time', time.time()))))
         payload['duration'] = game_state.get('answer_duration', 20)
-    
+
     if game_state['status'] in ['question', 'answering', 'result'] and game_state['questions'] and game_state['current_question'] < len(game_state['questions']):
         q = _current_question()
         payload['question'] = {
@@ -329,14 +336,13 @@ def on_admin_start_game():
 @socketio.on('admin_open_answer')
 def on_admin_open_answer():
     game_state['status'] = 'answering'
-    game_state['answer_start_time'] = time.time()  # 💡紀錄開始作答的時間
-    game_state['answer_duration'] = 20             # 💡紀錄作答秒數
+    game_state['answer_start_time'] = time.time()  
+    game_state['answer_duration'] = 20             
     for v in game_state['participants'].values(): v['answered'] = False
     q = _current_question()
+    
+    # 💡修改：移除 image、canvas_image、ai_image 的巨型 Base64 傳輸，告別卡頓！
     socketio.emit('start_answering', {
-        'image': game_state.get('ai_image') or game_state.get('canvas_data'),
-        'canvas_image': game_state.get('canvas_data'),
-        'ai_image': game_state.get('ai_image'),
         'has_ai': bool(game_state.get('ai_image') and game_state.get('canvas_data')),
         'ai_style': game_state.get('ai_style'),
         'options': q['options'],
