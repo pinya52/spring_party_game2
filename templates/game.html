@@ -102,10 +102,48 @@
   .podium-player-name { font-weight: bold; margin-bottom: 4px; font-size: 0.85rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center; }
   .podium-points { margin-bottom: 4px; color: var(--accent); font-weight: 900; font-size: 1.1rem; }
   
-  .normal-list { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 360px; margin: 0 auto; text-align: left; max-height: 45vh; overflow-y: auto; padding-right: 4px; }
-  .list-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: var(--surface); border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); border: 1px solid var(--border); }
-  .rank-badge { background: var(--surface2); color: var(--text); border-radius: 50%; width: 28px; height: 28px; display: inline-flex; justify-content: center; align-items: center; margin-right: 12px; font-size: 0.85rem; font-weight: 900; border: 1px solid var(--border); }
-
+  .normal-list { 
+      display: grid; 
+      grid-template-columns: repeat(4, 1fr); 
+      gap: 6px; 
+      width: 100%; 
+      max-width: 100%; 
+      margin: 0 auto; 
+      max-height: none; /* 移除滾動高度限制 */
+      overflow-y: visible;
+      padding: 0 4px;
+  }
+  .list-item { 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: center; 
+      align-items: center; 
+      padding: 10px 4px; 
+      background: var(--surface); 
+      border-radius: 12px; 
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2); 
+      border: 1px solid var(--border); 
+  }
+  .rank-badge { 
+      margin: 0 0 6px 0; 
+  }
+  .list-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+      text-align: center;
+      color: var(--text);
+  }
+  .list-score {
+      font-size: 0.85rem;
+      color: var(--accent);
+      font-weight: 900;
+      margin-top: 2px;
+      text-align: center;
+  }
   .btn-restart { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 12px; padding: 14px 32px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; margin-top: 20px;}
 
   .bg-gold { background: linear-gradient(180deg, rgba(234,179,8,0.15), var(--bg)); }
@@ -222,8 +260,9 @@ async function fetchGameState() {
         showScreen('screenAnswering');
         if (data.question && document.getElementById('optionsCol').innerHTML === '') {
             renderOptionsUI(data.question.options);
-            startAnswerTimer(20);
         }
+        // 💡使用伺服器精準的剩餘時間
+        startAnswerTimer(data.remaining_time !== undefined ? data.remaining_time : 20, data.duration || 20);
     } else if (data.phase === 'waiting' && currentPhase !== 'screenWaiting' && currentPhase !== 'screenLogin') {
         showScreen('screenWaiting');
     }
@@ -292,9 +331,10 @@ socket.on('join_success', data => {
       answeredThisRound = false;
       showScreen('screenAnswering');
       renderOptionsUI(data.question ? data.question.options : []);
-      startAnswerTimer(15); 
+      // 💡接收斷線重連的精準剩餘時間
+      startAnswerTimer(data.remaining_time !== undefined ? data.remaining_time : 15, data.duration || 20); 
     }
-  } 
+  }
   else if (data.status === 'result' || data.status === 'finished') {
     showScreen('screenWaitResult'); 
   }
@@ -312,7 +352,7 @@ socket.on('show_question', data => {
 socket.on('start_answering', data => {
   answeredThisRound = false; showScreen('screenAnswering');
   renderOptionsUI(data.options);
-  startAnswerTimer(data.duration || 20);
+  startAnswerTimer(data.duration || 20, data.duration || 20);
 });
 
 function renderOptionsUI(options) {
@@ -343,19 +383,26 @@ function selectAnswer(letter, el) {
   showScreen('screenWaitResult');
 }
 
-function startAnswerTimer(seconds) {
+// 💡支援接收 (剩餘時間, 總時間) 來計算正確的長度
+function startAnswerTimer(remaining, total) {
   clearInterval(timerInterval);
-  let remaining = seconds;
-  const fill = document.getElementById('aTimerFill'); const num = document.getElementById('aTimerNum'); const total = seconds;
+  let currentRem = remaining;
+  const fill = document.getElementById('aTimerFill'); 
+  const num = document.getElementById('aTimerNum'); 
+  
   function tick() {
-    num.textContent = remaining; fill.style.width = ((remaining / total) * 100) + '%';
-    if (remaining <= 5) { fill.style.background = '#ef4444'; num.className = 'answer-timer-num red'; if (navigator.vibrate && remaining > 0) navigator.vibrate(50); } 
-    else if (remaining <= 10) { fill.style.background = '#f97316'; num.className = 'answer-timer-num orange'; } 
+    num.textContent = currentRem; 
+    fill.style.width = ((currentRem / total) * 100) + '%';
+    
+    if (currentRem <= 5) { fill.style.background = '#ef4444'; num.className = 'answer-timer-num red'; if (navigator.vibrate && currentRem > 0) navigator.vibrate(50); } 
+    else if (currentRem <= 10) { fill.style.background = '#f97316'; num.className = 'answer-timer-num orange'; } 
     else { fill.style.background = '#3b82f6'; num.className = 'answer-timer-num'; }
-    if (remaining <= 0) { clearInterval(timerInterval); return; }
-    remaining--;
+    
+    if (currentRem <= 0) { clearInterval(timerInterval); return; }
+    currentRem--;
   }
-  tick(); timerInterval = setInterval(tick, 1000);
+  tick(); 
+  timerInterval = setInterval(tick, 1000);
 }
 
 socket.on('answer_result', data => { clearInterval(timerInterval); pendingResult = data; showScreen('screenWaitResult'); });
@@ -435,8 +482,9 @@ function renderLeaderboard(rankingData) {
     for (let i = 3; i < players.length; i++) {
       html += `
       <div class="list-item">
-          <span><span class="rank-badge">${players[i].displayRank}</span> ${players[i].name}</span>
-          <span style="color:var(--accent); font-weight:bold;">${players[i].rankPoints} 積分</span>
+          <span class="rank-badge">${players[i].displayRank}</span>
+          <span class="list-name">${players[i].name}</span>
+          <span class="list-score">${players[i].rankPoints} 積分</span>
       </div>`;
     }
     html += `</div>`;

@@ -35,7 +35,9 @@ game_state = {
     'canvas_data': None,
     'ai_image': None,
     'ai_style': None,
-    'drawing_active': False
+    'drawing_active': False,
+    'answer_start_time': 0, # 新增起始時間
+    'answer_duration': 20   # 新增總時間長度
 }
 
 MAX_PARTICIPANTS = 20
@@ -175,11 +177,18 @@ def api_get_game_state():
             'correct': q['correct'] if game_state['status'] == 'result' else None
         }
     
+    # 💡計算剩餘時間
+    rem = 0
+    if game_state['status'] == 'answering':
+        rem = max(0, int(game_state['answer_duration'] - (time.time() - game_state.get('answer_start_time', time.time()))))
+
     return jsonify({
         'phase': game_state['status'],
         'imageData': game_state.get('canvas_data') or game_state.get('ai_image'),
         'players': _get_full_ranking(),
-        'question': q_data
+        'question': q_data,
+        'remaining_time': rem,                                 # 新增
+        'duration': game_state.get('answer_duration', 20)      # 新增
     })
 
 @app.route('/api/upload_questions', methods=['POST'])
@@ -257,6 +266,11 @@ def on_join_game(data):
         'answered': game_state['participants'][uid]['answered']
     }
     
+    # 💡新增：連線時告訴手機端剩下幾秒
+    if game_state['status'] == 'answering':
+        payload['remaining_time'] = max(0, int(game_state['answer_duration'] - (time.time() - game_state.get('answer_start_time', time.time()))))
+        payload['duration'] = game_state.get('answer_duration', 20)
+    
     if game_state['status'] in ['question', 'answering', 'result'] and game_state['questions'] and game_state['current_question'] < len(game_state['questions']):
         q = _current_question()
         payload['question'] = {
@@ -315,6 +329,8 @@ def on_admin_start_game():
 @socketio.on('admin_open_answer')
 def on_admin_open_answer():
     game_state['status'] = 'answering'
+    game_state['answer_start_time'] = time.time()  # 💡紀錄開始作答的時間
+    game_state['answer_duration'] = 20             # 💡紀錄作答秒數
     for v in game_state['participants'].values(): v['answered'] = False
     q = _current_question()
     socketio.emit('start_answering', {
