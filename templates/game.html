@@ -450,10 +450,12 @@ socket.on('game_finished', data => {
 });
 
 // 計算名次積分與渲染 UI
+// 計算名次積分與渲染 UI
 function renderLeaderboard(rankingData) {
   let players = rankingData.map(p => ({...p}));
   let currentRank = 1;
   
+  // 計算排名與積分 (跟大螢幕邏輯相同)
   for (let i = 0; i < players.length; i++) {
     if (i > 0 && players[i].score === players[i - 1].score) {
       players[i].rankPoints = players[i - 1].rankPoints;
@@ -461,35 +463,42 @@ function renderLeaderboard(rankingData) {
       currentRank = i + 1;
       players[i].rankPoints = 20 - currentRank; 
     }
-    // 💡修改：移除「未登入加入的玩家強制歸 0」的判斷，讓所有人都能獲得並列積分
-    
     players[i].displayRank = currentRank; 
   }
 
   const container = document.getElementById('leaderboardContent');
   if (!container) return;
 
-  // 繪製前三名頒獎台
-  let html = `<div class="podium-container">`;
-  if (players[1]) html += generatePodiumHTML(players[1], 2);
-  if (players[0]) html += generatePodiumHTML(players[0], 1);
-  if (players[2]) html += generatePodiumHTML(players[2], 3);
-  html += `</div>`;
-
-  // 繪製 4-19 名清單
-  if (players.length > 3) {
-    html += `<div class="normal-list">`;
-    for (let i = 3; i < players.length; i++) {
-      html += `
-      <div class="list-item">
-          <span class="rank-badge">${players[i].displayRank}</span>
-          <span class="list-name">${players[i].name}</span>
-          <span class="list-score">${players[i].rankPoints} 積分</span>
-      </div>`;
-    }
-    html += `</div>`;
+  // 💡修改：只過濾出自己的資料，不顯示其他玩家
+  const myEntry = players.find(p => p.name === myName);
+  
+  if (myEntry) {
+      // 借用原本答題完成的 score-card 樣式來顯示最終成績
+      container.innerHTML = `
+      <div class="score-card" style="margin: 0 auto;">
+        <div style="text-align:center; margin-bottom: 16px; color: var(--muted); font-size: 0.95rem;">本次遊戲結算</div>
+        
+        <div class="score-row">
+            <span class="label">最終排名</span>
+            <span class="value rank-display" style="font-size: 2.8rem;">
+                ${myEntry.displayRank <= 3 ? ['🥇','🥈','🥉'][myEntry.displayRank-1] : '#' + myEntry.displayRank}
+            </span>
+        </div>
+        
+        <div class="score-row total" style="margin-top: 8px;">
+            <span class="label">獲得積分</span>
+            <span class="value" style="font-size: 2rem;">${myEntry.rankPoints}</span>
+        </div>
+        
+        <div class="score-row" style="margin-top: 8px;">
+            <span class="label">原始總分</span>
+            <span class="value" style="font-size: 1.1rem; color: var(--muted);">${myEntry.score}</span>
+        </div>
+      </div>
+      `;
+  } else {
+      container.innerHTML = `<div style="text-align:center; color: var(--muted);">找不到您的成績資料</div>`;
   }
-  container.innerHTML = html;
 }
 
 // 產生頒獎台 HTML

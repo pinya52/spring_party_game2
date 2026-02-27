@@ -333,7 +333,7 @@ function calculateRankPoints(rankingData) {
     return players;
 }
 
-ffunction renderFinishedRanking(ranking, isRankPoints = false) {
+function renderFinishedRanking(ranking, isRankPoints = false) {
   let processedRanking = isRankPoints ? calculateRankPoints(ranking) : ranking.map((p, i) => ({...p, displayRank: i + 1, rankPoints: p.score}));
   
   const top3 = processedRanking.slice(0, 3);
