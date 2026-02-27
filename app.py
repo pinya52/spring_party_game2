@@ -223,9 +223,10 @@ def on_disconnect():
     if uid: 
         game_state['participants'][uid]['online'] = False
         if game_state['status'] == 'answering':
-            online_p = [v for v in game_state['participants'].values() if v.get('online', True)]
-            answered_count = sum(1 for v in online_p if v['answered'])
-            total_count = len(online_p)
+            # 💡修改：不再過濾 online，而是等待所有有登入過的玩家
+            joined_p = game_state['participants'].values()
+            answered_count = sum(1 for v in joined_p if v['answered'])
+            total_count = len(joined_p)
             socketio.emit('answer_progress', {'answered': answered_count, 'total': total_count})
             if answered_count >= total_count and total_count > 0:
                 _auto_show_result()
@@ -248,7 +249,7 @@ def on_join_game(data):
             emit('join_error', {'message': '已達人數上限'}); return
         game_state['participants'][uid] = {'sid': sid, 'name': name, 'score': 0, 'streak': 0, 'answered': False, 'online': True}
     
-    plist = [{'sid': v['sid'], 'name': v['name'], 'score': v['score']} for v in game_state['participants'].values()]
+    plist = [{'sid': v['sid'], 'name': v['name'], 'score': v['score'], 'online': v.get('online', True)} for v in game_state['participants'].values()]
     
     payload = {
         'name': name,
@@ -287,7 +288,7 @@ def on_request_rename():
     
     name = game_state['participants'][uid]['name']
     del game_state['participants'][uid]
-    plist = [{'sid': v['sid'], 'name': v['name'], 'score': v['score']} for v in game_state['participants'].values()]
+    plist = [{'sid': v['sid'], 'name': v['name'], 'score': v['score'], 'online': v.get('online', True)} for v in game_state['participants'].values()]
     emit('rename_ok', {})
     socketio.emit('participant_left', {'name': name, 'participants': plist, 'count': len(plist)})
 
@@ -298,7 +299,7 @@ def on_admin_kick(data):
     if target_uid:
         target_sid = game_state['participants'][target_uid]['sid']
         del game_state['participants'][target_uid]
-        plist = [{'sid': v['sid'], 'name': v['name'], 'score': v['score']} for v in game_state['participants'].values()]
+        plist = [{'sid': v['sid'], 'name': v['name'], 'score': v['score'], 'online': v.get('online', True)} for v in game_state['participants'].values()]
         socketio.emit('participant_left', {'name': target_name, 'participants': plist, 'count': len(plist)})
         socketio.emit('kicked', {}, to=target_sid)
 
@@ -392,9 +393,9 @@ def on_submit_answer(data):
         'total_score': p['score'], 'rank': my_rank, 'streak': p['streak'],
     })
 
-    online_p = [v for v in game_state['participants'].values() if v.get('online', True)]
-    answered_count = sum(1 for v in online_p if v['answered'])
-    total_count = len(online_p)
+    joined_p = game_state['participants'].values()
+    answered_count = sum(1 for v in joined_p if v['answered'])
+    total_count = len(joined_p)
     
     socketio.emit('answer_progress', {'answered': answered_count, 'total': total_count})
     if answered_count >= total_count and total_count > 0:

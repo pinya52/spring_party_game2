@@ -358,9 +358,8 @@ socket.on('show_rank_points_screen', data => {
 });
 
 function renderParticipants(list, count) {
-  // 過濾掉沒登入的人數計算
-  const onlineCount = list.filter(p => p.online).length;
-  document.getElementById('wCount').textContent = `${onlineCount} / 19 桌已就緒`;
+  // 💡修改：只要登入過的都算入準備就緒，不論他當下是否剛好斷線重整
+  document.getElementById('wCount').textContent = `${list.length} / 19 桌已就緒`;
   const sorted = [...list].sort((a, b) => parseInt(a.name) - parseInt(b.name));
   document.getElementById('wParticipants').innerHTML = sorted.map(p => `<div class="w-participant">${p.name}</div>`).join('');
 }

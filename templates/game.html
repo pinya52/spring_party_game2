@@ -208,8 +208,30 @@ window.onload = () => {
   if (savedNumber) {
     document.getElementById('nameInput').value = savedNumber;
     joinGame();
+    fetchGameState(); // 💡新增：自動登入後立刻拿一次狀態
   }
 };
+
+// 💡新增：把 polling 抽出獨立的 function，方便馬上呼叫
+async function fetchGameState() {
+  if (!myName) return;
+  try {
+    const res = await fetch('/api/get-game-state');
+    const data = await res.json();
+    if (data.phase === 'answering' && currentPhase !== 'screenAnswering' && currentPhase !== 'screenWaitResult' && !answeredThisRound) {
+        showScreen('screenAnswering');
+        if (data.question && document.getElementById('optionsCol').innerHTML === '') {
+            renderOptionsUI(data.question.options);
+            startAnswerTimer(20);
+        }
+    } else if (data.phase === 'waiting' && currentPhase !== 'screenWaiting' && currentPhase !== 'screenLogin') {
+        showScreen('screenWaiting');
+    }
+  } catch (err) { console.error('Polling error', err); }
+}
+
+// 💡修改：把原本的 setInterval 換成呼叫獨立 function，並將頻率加速至 1 秒
+setInterval(fetchGameState, 1000);
 
 function showScreen(id) {
   currentPhase = id;
@@ -277,29 +299,6 @@ socket.on('join_success', data => {
     showScreen('screenWaitResult'); 
   }
 });
-
-// ==========================================
-// 🚨 防漏接收的 Polling 機制
-// ==========================================
-setInterval(async () => {
-  if (!myName) return; // 沒登入不執行
-  try {
-    const res = await fetch('/api/get-game-state');
-    const data = await res.json();
-    
-    // 如果事件遺失導致停留在錯誤畫面，強制切換
-    if (data.phase === 'answering' && currentPhase !== 'screenAnswering' && currentPhase !== 'screenWaitResult' && !answeredThisRound) {
-        showScreen('screenAnswering');
-        if (data.question && document.getElementById('optionsCol').innerHTML === '') {
-            renderOptionsUI(data.question.options);
-            startAnswerTimer(20);
-        }
-    } else if (data.phase === 'waiting' && currentPhase !== 'screenWaiting' && currentPhase !== 'screenLogin') {
-        showScreen('screenWaiting');
-    }
-
-  } catch (err) { console.error('Polling error', err); }
-}, 2000);
 
 socket.on('show_question', data => {
   answeredThisRound = false; pendingResult = null; clearInterval(timerInterval);
@@ -405,21 +404,17 @@ socket.on('game_finished', data => {
 
 // 計算名次積分與渲染 UI
 function renderLeaderboard(rankingData) {
-  // 從後端來的已經由高到低排好
   let players = rankingData.map(p => ({...p}));
   let currentRank = 1;
   
   for (let i = 0; i < players.length; i++) {
     if (i > 0 && players[i].score === players[i - 1].score) {
-      // 同分者拿一樣的積分
       players[i].rankPoints = players[i - 1].rankPoints;
     } else {
-      // 根據實質排序給積分 (第一名19分，第二名18分...)
       currentRank = i + 1;
       players[i].rankPoints = 20 - currentRank; 
     }
-    // 未登入加入的玩家強制歸 0
-    if (players[i].joined === false) players[i].rankPoints = 0;
+    // 💡修改：移除「未登入加入的玩家強制歸 0」的判斷，讓所有人都能獲得並列積分
     
     players[i].displayRank = currentRank; 
   }
