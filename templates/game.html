@@ -4,10 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>你畫我猜</title>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
-
 <style>
   :root {
     --bg: #0e0e14;
@@ -19,50 +17,25 @@
     --radius: 16px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Noto Sans TC', sans-serif;
-    min-height: 100dvh; overflow-x: hidden;
-    display: flex; flex-direction: column; align-items: center;
-  }
-
-  /* ── SCREENS ── */
+  body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; min-height: 100dvh; overflow-x: hidden; display: flex; flex-direction: column; align-items: center; }
   .screen { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; min-height: 100dvh; padding: 24px; }
   .screen.active { display: flex; }
 
-  /* ── LOGIN ── */
-  #screenLogin {
-    background: radial-gradient(ellipse at 50% 30%, #1a0a2e 0%, var(--bg) 70%);
-  }
+  #screenLogin { background: radial-gradient(ellipse at 50% 30%, #1a0a2e 0%, var(--bg) 70%); }
   .logo { font-size: 3.5rem; margin-bottom: 4px; }
   .logo-title { font-size: 1.8rem; font-weight: 900; color: var(--accent); margin-bottom: 4px; }
   .logo-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 40px; }
-  .login-card {
-    background: var(--surface); border: 1px solid var(--border);
-    border-radius: 20px; padding: 28px; width: 100%; max-width: 360px;
-  }
+  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 28px; width: 100%; max-width: 360px; }
   .login-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; }
-  input[type=text] {
-    width: 100%; background: var(--bg); border: 2px solid var(--border);
-    border-radius: 12px; color: var(--text); padding: 14px 16px;
-    font-size: 1.1rem; font-family: 'Noto Sans TC', sans-serif;
-    transition: border-color 0.2s; margin-bottom: 16px;
-  }
+  input[type=text] { width: 100%; background: var(--bg); border: 2px solid var(--border); border-radius: 12px; color: var(--text); padding: 14px 16px; font-size: 1.1rem; font-family: 'Noto Sans TC', sans-serif; transition: border-color 0.2s; margin-bottom: 16px; }
   input[type=text]:focus { outline: none; border-color: var(--accent); }
-  .btn-join {
-    width: 100%; background: linear-gradient(135deg, var(--accent), #7c3aed);
-    color: #fff; border: none; border-radius: 12px; padding: 16px;
-    font-size: 1.1rem; font-weight: 700; cursor: pointer;
-    font-family: 'Noto Sans TC', sans-serif; transition: opacity 0.2s;
-    box-shadow: 0 8px 32px rgba(168,85,247,0.3);
-  }
+  .btn-join { width: 100%; background: linear-gradient(135deg, var(--accent), #7c3aed); color: #fff; border: none; border-radius: 12px; padding: 16px; font-size: 1.1rem; font-weight: 700; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; transition: opacity 0.2s; box-shadow: 0 8px 32px rgba(168,85,247,0.3); }
   .btn-join:active { opacity: 0.85; transform: scale(0.98); }
   .error-msg { color: var(--red); font-size: 0.85rem; margin-top: 8px; min-height: 20px; }
   .conn-indicator { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); margin-bottom: 24px; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
   .dot.green { background: var(--green); box-shadow: 0 0 8px var(--green); }
 
-  /* ── WAITING ── */
   #screenWaiting { gap: 16px; }
   .welcome-icon { font-size: 4rem; animation: bounce 2s infinite; }
   @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
@@ -71,21 +44,18 @@
   .pulse-ring { width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--accent); animation: pulse 2s infinite; }
   @keyframes pulse { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.6); opacity: 0; } }
 
-  /* ── QUESTION (on phone) ── */
   #screenQuestion { gap: 20px; }
   .phone-q-num { font-family: 'Space Mono', monospace; font-size: 0.85rem; color: var(--accent); }
   .phone-q-text { font-size: 1.3rem; font-weight: 700; text-align: center; line-height: 1.4; }
   .phone-countdown { font-size: 5rem; font-weight: 900; color: var(--accent); font-family: 'Space Mono', monospace; animation: cPulse 1s ease infinite; }
   @keyframes cPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 
-  /* ── DRAWING WATCH ── */
   #screenDrawing { gap: 14px; text-align: center; }
   .tv-icon { font-size: 5rem; }
   .drawing-heading { font-size: 1.4rem; font-weight: 900; color: var(--accent); }
   .drawing-tips { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 320px; }
   .tip-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 10px; padding: 10px 14px; font-size: 0.9rem; }
 
-  /* ── ANSWERING ── */
   #screenAnswering { justify-content: flex-start; padding: 16px; gap: 12px; }
   .answer-timer-row { display: flex; align-items: center; gap: 12px; width: 100%; }
   .answer-timer-bar { flex: 1; height: 10px; background: var(--border); border-radius: 99px; overflow: hidden; }
@@ -96,12 +66,7 @@
   @keyframes shake { 0%,100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
 
   .options-col { display: flex; flex-direction: column; gap: 12px; width: 100%; }
-  .option-btn {
-    width: 100%; border: none; border-radius: var(--radius); padding: 20px 20px;
-    font-size: 1.1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 14px;
-    font-family: 'Noto Sans TC', sans-serif; transition: transform 0.1s, opacity 0.3s;
-    text-align: left; position: relative; overflow: hidden;
-  }
+  .option-btn { width: 100%; border: none; border-radius: var(--radius); padding: 20px 20px; font-size: 1.1rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 14px; font-family: 'Noto Sans TC', sans-serif; transition: transform 0.1s, opacity 0.3s; text-align: left; position: relative; overflow: hidden; }
   .option-btn:active { transform: scale(0.96); }
   .option-btn.disabled { opacity: 0.3; pointer-events: none; }
   .option-btn .letter { font-family: 'Space Mono', monospace; font-size: 1rem; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; }
@@ -113,11 +78,9 @@
   .check-mark { margin-left: auto; font-size: 1.4rem; display: none; }
   .option-btn.selected .check-mark { display: block; }
 
-  /* ── WAITING RESULT ── */
   #screenWaitResult { gap: 16px; }
   .submitted-icon { font-size: 4rem; }
 
-  /* ── RESULT ── */
   #screenResult { gap: 14px; }
   .result-correct { font-size: 0.9rem; color: var(--muted); }
   .answer-tag { display: inline-block; padding: 8px 20px; border-radius: 99px; font-weight: 700; font-size: 1.1rem; }
@@ -129,19 +92,16 @@
   .score-row.total .value { font-size: 1.4rem; }
   .rank-display { font-size: 2.5rem; font-weight: 900; }
 
-  /* ── FINISHED ── */
   #screenFinished { gap: 16px; }
   .final-medal { font-size: 5rem; }
   .final-rank { font-size: 1.4rem; font-weight: 900; color: var(--accent); }
   .final-score-num { font-family: 'Space Mono', monospace; font-size: 2rem; }
   .btn-restart { background: var(--surface2); border: 1px solid var(--border); color: var(--text); border-radius: 12px; padding: 14px 32px; font-size: 1rem; font-weight: 700; cursor: pointer; font-family: 'Noto Sans TC', sans-serif; }
 
-  /* Gold/Silver/Bronze backgrounds */
   .bg-gold { background: linear-gradient(180deg, rgba(234,179,8,0.15), var(--bg)); }
   .bg-silver { background: linear-gradient(180deg, rgba(148,163,184,0.1), var(--bg)); }
   .bg-bronze { background: linear-gradient(180deg, rgba(180,83,9,0.12), var(--bg)); }
 
-  /* Toast */
   #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-60px); background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 20px; font-size: 0.88rem; transition: transform 0.3s; z-index: 99; white-space: nowrap; }
   #toast.show { transform: translateX(-50%) translateY(0); }
 </style>
@@ -155,12 +115,8 @@
   <div class="conn-indicator"><div class="dot" id="connDot"></div><span id="connText">連線中...</span></div>
   <div class="login-card">
     <div class="login-label">輸入您的桌號（01–19）</div>
-    <input type="text" id="nameInput" placeholder="例如：05" maxlength="2" autocomplete="off"
-      inputmode="numeric" pattern="[0-9]*"
-      style="font-size:2rem;text-align:center;letter-spacing:0.3em;font-family:'Space Mono',monospace;">
-    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:14px;text-align:center;">
-      輸入後名稱將顯示為「05桌」
-    </div>
+    <input type="text" id="nameInput" placeholder="例如：05" maxlength="2" autocomplete="off" inputmode="numeric" pattern="[0-9]*" style="font-size:2rem;text-align:center;letter-spacing:0.3em;font-family:'Space Mono',monospace;">
+    <div style="font-size:0.78rem;color:var(--muted);margin-bottom:14px;text-align:center;">輸入後名稱將顯示為「05桌」</div>
     <button class="btn-join" onclick="joinGame()">加入遊戲 →</button>
     <div class="error-msg" id="errorMsg"></div>
   </div>
@@ -173,11 +129,7 @@
   </div>
   <div class="welcome-name" id="welcomeName"></div>
   <div class="wait-text">成功加入！<br>等待管理員開始遊戲...</div>
-  <button id="btnRename" onclick="requestRename()"
-    style="margin-top:24px;background:transparent;border:1px solid var(--border);color:var(--muted);
-    border-radius:10px;padding:10px 24px;font-size:0.88rem;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">
-    ✏️ 重新輸入桌號
-  </button>
+  <button id="btnRename" onclick="requestRename()" style="margin-top:24px;background:transparent;border:1px solid var(--border);color:var(--muted); border-radius:10px;padding:10px 24px;font-size:0.88rem;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">✏️ 重新輸入桌號</button>
 </div>
 
 <div class="screen" id="screenQuestion">
@@ -236,14 +188,12 @@
 <div id="toast"></div>
 
 <script>
-// 初始化 Socket 連線並設定防斷線參數
 const socket = io({ transports: ['websocket', 'polling'] });
 let myName = '';
 let timerInterval = null;
 let answeredThisRound = false;
-let pendingResult = null; 
+let pendingResult = null;
 
-// 👇 網頁載入時，檢查是否有暫存的桌號，有的話直接自動登入
 window.onload = () => {
   const savedNumber = localStorage.getItem('my_table_number');
   if (savedNumber) {
@@ -257,7 +207,6 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
 }
 
-// 連線狀態顯示
 socket.on('connect', () => {
   document.getElementById('connDot').className = 'dot green';
   document.getElementById('connText').textContent = '已連線';
@@ -267,92 +216,88 @@ socket.on('disconnect', () => {
   document.getElementById('connText').textContent = '已斷線';
 });
 
-// 加入遊戲邏輯
 function joinGame() {
   const raw = document.getElementById('nameInput').value.trim();
   if (!raw) { setError('請輸入桌號'); return; }
-  if (!/^(0[1-9]|1[0-9])$/.test(raw)) {
-    setError('請輸入 01–19 之間的兩位數字（例如：05）'); return;
-  }
+  if (!/^(0[1-9]|1[0-9])$/.test(raw)) { setError('請輸入 01–19 之間的兩位數字（例如：05）'); return; }
   setError('');
-  // 儲存桌號到瀏覽器
   localStorage.setItem('my_table_number', raw);
   socket.emit('join_game', { number: raw });
 }
 
 document.getElementById('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') joinGame(); });
-document.getElementById('nameInput').addEventListener('input', e => {
-  let v = e.target.value.replace(/[^0-9]/g, '').slice(0, 2);
-  e.target.value = v;
-});
+document.getElementById('nameInput').addEventListener('input', e => { e.target.value = e.target.value.replace(/[^0-9]/g, '').slice(0, 2); });
 
-function requestRename() {
-  socket.emit('request_rename');
-}
+function requestRename() { socket.emit('request_rename'); }
 
 socket.on('rename_ok', () => {
-  myName = '';
-  localStorage.removeItem('my_table_number'); // 清除紀錄
-  document.getElementById('nameInput').value = '';
-  setError('');
-  showScreen('screenLogin');
+  myName = ''; localStorage.removeItem('my_table_number'); document.getElementById('nameInput').value = '';
+  setError(''); showScreen('screenLogin');
 });
 
 socket.on('kicked', () => {
-  myName = '';
-  localStorage.removeItem('my_table_number'); // 清除紀錄
-  document.getElementById('nameInput').value = '';
-  setError('');
-  showToast('您已被管理員移除，請重新輸入桌號');
-  showScreen('screenLogin');
+  myName = ''; localStorage.removeItem('my_table_number'); document.getElementById('nameInput').value = '';
+  setError(''); showToast('您已被管理員移除，請重新輸入桌號'); showScreen('screenLogin');
 });
 
 socket.on('join_error', data => setError(data.message));
+
 socket.on('join_success', data => {
   myName = data.name;
   document.getElementById('welcomeName').textContent = data.name;
   setError('');
-  showScreen('screenWaiting');
+  
+  if (data.status === 'waiting') {
+    showScreen('screenWaiting');
+  } 
+  else if (data.status === 'question' || data.status === 'started') {
+    showScreen('screenDrawing');
+  } 
+  else if (data.status === 'answering') {
+    if (data.answered) {
+      showScreen('screenWaitResult'); 
+    } else {
+      answeredThisRound = false;
+      showScreen('screenAnswering');
+      const colors = [
+        {cls:'red-btn', letter:'A', letterBg:'#ef4444'}, {cls:'green-btn', letter:'B', letterBg:'#22c55e'},
+        {cls:'yellow-btn', letter:'C', letterBg:'#eab308'}, {cls:'blue-btn', letter:'D', letterBg:'#3b82f6'},
+      ];
+      const col = document.getElementById('optionsCol');
+      if (data.question && data.question.options) {
+        col.innerHTML = data.question.options.map((opt, i) => `
+          <button class="option-btn ${colors[i].cls}" onclick="selectAnswer('${colors[i].letter}', this)" id="btnOpt${colors[i].letter}">
+            <span class="letter" style="background:${colors[i].letterBg}">${colors[i].letter}</span> ${opt} <span class="check-mark">✓</span>
+          </button>
+        `).join('');
+      }
+      startAnswerTimer(15); 
+    }
+  } 
+  else if (data.status === 'result' || data.status === 'finished') {
+    showScreen('screenWaitResult'); 
+  }
 });
 
-socket.on('game_state', data => {
-  if (data.status === 'waiting') return;
-});
-
-// 接收題目廣播
 socket.on('show_question', data => {
-  answeredThisRound = false;
-  pendingResult = null;
-  clearInterval(timerInterval);
+  answeredThisRound = false; pendingResult = null; clearInterval(timerInterval);
   showScreen('screenQuestion');
   document.getElementById('phoneQNum').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
   document.getElementById('phoneQText').textContent = data.description;
-  let cd = 5;
-  const el = document.getElementById('phoneCd');
-  el.textContent = cd;
-  const t = setInterval(() => {
-    cd--;
-    if (cd <= 0) { clearInterval(t); showScreen('screenDrawing'); }
-    else el.textContent = cd;
-  }, 1000);
+  let cd = 5; const el = document.getElementById('phoneCd'); el.textContent = cd;
+  const t = setInterval(() => { cd--; if (cd <= 0) { clearInterval(t); showScreen('screenDrawing'); } else el.textContent = cd; }, 1000);
 });
 
-// 開放答題廣播
 socket.on('start_answering', data => {
-  answeredThisRound = false;
-  showScreen('screenAnswering');
+  answeredThisRound = false; showScreen('screenAnswering');
   const colors = [
-    {cls:'red-btn', letter:'A', letterBg:'#ef4444'},
-    {cls:'green-btn', letter:'B', letterBg:'#22c55e'},
-    {cls:'yellow-btn', letter:'C', letterBg:'#eab308'},
-    {cls:'blue-btn', letter:'D', letterBg:'#3b82f6'},
+    {cls:'red-btn', letter:'A', letterBg:'#ef4444'}, {cls:'green-btn', letter:'B', letterBg:'#22c55e'},
+    {cls:'yellow-btn', letter:'C', letterBg:'#eab308'}, {cls:'blue-btn', letter:'D', letterBg:'#3b82f6'},
   ];
   const col = document.getElementById('optionsCol');
   col.innerHTML = data.options.map((opt, i) => `
     <button class="option-btn ${colors[i].cls}" onclick="selectAnswer('${colors[i].letter}', this)" id="btnOpt${colors[i].letter}">
-      <span class="letter" style="background:${colors[i].letterBg}">${colors[i].letter}</span>
-      ${opt}
-      <span class="check-mark">✓</span>
+      <span class="letter" style="background:${colors[i].letterBg}">${colors[i].letter}</span> ${opt} <span class="check-mark">✓</span>
     </button>
   `).join('');
   startAnswerTimer(data.duration || 20);
@@ -363,11 +308,8 @@ function selectAnswer(letter, el) {
   answeredThisRound = true;
   const timeFill = document.getElementById('aTimerFill');
   const pct = parseFloat(timeFill.style.width);
-  const total = 20;
-  const time_taken = ((100 - pct) / 100) * total;
-  document.querySelectorAll('.option-btn').forEach(b => {
-    if (b !== el) b.classList.add('disabled');
-  });
+  const total = 20; const time_taken = ((100 - pct) / 100) * total;
+  document.querySelectorAll('.option-btn').forEach(b => { if (b !== el) b.classList.add('disabled'); });
   el.classList.add('selected');
   if (navigator.vibrate) navigator.vibrate(40);
   socket.emit('submit_answer', { answer: letter, time_taken });
@@ -378,125 +320,60 @@ function selectAnswer(letter, el) {
 function startAnswerTimer(seconds) {
   clearInterval(timerInterval);
   let remaining = seconds;
-  const fill = document.getElementById('aTimerFill');
-  const num = document.getElementById('aTimerNum');
-  const total = seconds;
+  const fill = document.getElementById('aTimerFill'); const num = document.getElementById('aTimerNum'); const total = seconds;
   function tick() {
-    num.textContent = remaining;
-    fill.style.width = ((remaining / total) * 100) + '%';
-    if (remaining <= 5) {
-      fill.style.background = '#ef4444'; num.className = 'answer-timer-num red';
-      if (navigator.vibrate && remaining > 0) navigator.vibrate(50);
-    } else if (remaining <= 10) {
-      fill.style.background = '#f97316'; num.className = 'answer-timer-num orange';
-    } else {
-      fill.style.background = '#3b82f6'; num.className = 'answer-timer-num';
-    }
+    num.textContent = remaining; fill.style.width = ((remaining / total) * 100) + '%';
+    if (remaining <= 5) { fill.style.background = '#ef4444'; num.className = 'answer-timer-num red'; if (navigator.vibrate && remaining > 0) navigator.vibrate(50); } 
+    else if (remaining <= 10) { fill.style.background = '#f97316'; num.className = 'answer-timer-num orange'; } 
+    else { fill.style.background = '#3b82f6'; num.className = 'answer-timer-num'; }
     if (remaining <= 0) { clearInterval(timerInterval); return; }
     remaining--;
   }
-  tick();
-  timerInterval = setInterval(tick, 1000);
+  tick(); timerInterval = setInterval(tick, 1000);
 }
 
-socket.on('answer_result', data => {
-  clearInterval(timerInterval);
-  pendingResult = data;
-  showScreen('screenWaitResult');
-});
+socket.on('answer_result', data => { clearInterval(timerInterval); pendingResult = data; showScreen('screenWaitResult'); });
 
-// 公布解答
 socket.on('show_result', data => {
   clearInterval(timerInterval);
   if (pendingResult) {
-    const d = pendingResult;
-    const labels = {A:'A 選項', B:'B 選項', C:'C 選項', D:'D 選項'};
-    const colors = {A:'#ef4444', B:'#22c55e', C:'#eab308', D:'#3b82f6'};
-    const correct = data.correct_answer;
-    const tag = document.getElementById('correctTag');
-    tag.textContent = `✓ ${labels[correct]}`;
-    tag.style.background = colors[correct] + '33';
-    tag.style.border = `2px solid ${colors[correct]}`;
-    tag.style.color = colors[correct];
-    document.getElementById('baseScore').textContent = '+' + d.base_score;
-    document.getElementById('timeBonus').textContent = '+' + d.time_bonus;
-    document.getElementById('streakBonus').textContent = '+' + d.streak_bonus;
-    document.getElementById('totalScore').textContent = d.total_score;
-    const rankEl = document.getElementById('myRank');
-    rankEl.textContent = ['🥇','🥈','🥉'][d.rank-1] || '#' + d.rank;
-    const screen = document.getElementById('screenResult');
-    screen.className = 'screen' + (d.rank===1?' bg-gold':d.rank===2?' bg-silver':d.rank===3?' bg-bronze':'');
-    if (d.rank <= 3 && navigator.vibrate) navigator.vibrate([100, 50, 100]);
-    showScreen('screenResult');
+    const d = pendingResult; const labels = {A:'A 選項', B:'B 選項', C:'C 選項', D:'D 選項'}; const colors = {A:'#ef4444', B:'#22c55e', C:'#eab308', D:'#3b82f6'};
+    const correct = data.correct_answer; const tag = document.getElementById('correctTag');
+    tag.textContent = `✓ ${labels[correct]}`; tag.style.background = colors[correct] + '33'; tag.style.border = `2px solid ${colors[correct]}`; tag.style.color = colors[correct];
+    document.getElementById('baseScore').textContent = '+' + d.base_score; document.getElementById('timeBonus').textContent = '+' + d.time_bonus; document.getElementById('streakBonus').textContent = '+' + d.streak_bonus; document.getElementById('totalScore').textContent = d.total_score;
+    const rankEl = document.getElementById('myRank'); rankEl.textContent = ['🥇','🥈','🥉'][d.rank-1] || '#' + d.rank;
+    const screen = document.getElementById('screenResult'); screen.className = 'screen' + (d.rank===1?' bg-gold':d.rank===2?' bg-silver':d.rank===3?' bg-bronze':'');
+    if (d.rank <= 3 && navigator.vibrate) navigator.vibrate([100, 50, 100]); showScreen('screenResult');
   } else {
-    const colors = {A:'#ef4444', B:'#22c55e', C:'#eab308', D:'#3b82f6'};
-    const correct = data.correct_answer;
-    const tag = document.getElementById('correctTag');
-    tag.textContent = `✓ ${data.correct_answer} 選項`;
-    tag.style.background = colors[correct] + '33';
-    tag.style.border = `2px solid ${colors[correct]}`;
-    tag.style.color = colors[correct];
-    document.getElementById('baseScore').textContent = '+0';
-    document.getElementById('timeBonus').textContent = '+0';
-    document.getElementById('streakBonus').textContent = '+0';
-    const me = data.ranking ? data.ranking.find(r => r.name === myName) : null;
-    document.getElementById('totalScore').textContent = me ? me.score : '-';
-    const myIdx = data.ranking ? data.ranking.findIndex(r => r.name === myName) : -1;
-    const rank = myIdx + 1;
-    document.getElementById('myRank').textContent = rank > 0 ? (['🥇','🥈','🥉'][rank-1] || '#' + rank) : '-';
-    const screen = document.getElementById('screenResult');
-    screen.className = 'screen';
-    showScreen('screenResult');
+    const colors = {A:'#ef4444', B:'#22c55e', C:'#eab308', D:'#3b82f6'}; const correct = data.correct_answer; const tag = document.getElementById('correctTag');
+    tag.textContent = `✓ ${data.correct_answer} 選項`; tag.style.background = colors[correct] + '33'; tag.style.border = `2px solid ${colors[correct]}`; tag.style.color = colors[correct];
+    document.getElementById('baseScore').textContent = '+0'; document.getElementById('timeBonus').textContent = '+0'; document.getElementById('streakBonus').textContent = '+0';
+    const me = data.ranking ? data.ranking.find(r => r.name === myName) : null; document.getElementById('totalScore').textContent = me ? me.score : '-';
+    const myIdx = data.ranking ? data.ranking.findIndex(r => r.name === myName) : -1; const rank = myIdx + 1; document.getElementById('myRank').textContent = rank > 0 ? (['🥇','🥈','🥉'][rank-1] || '#' + rank) : '-';
+    const screen = document.getElementById('screenResult'); screen.className = 'screen'; showScreen('screenResult');
   }
   pendingResult = null;
 });
 
 socket.on('game_finished', data => {
-  const myEntry = data.ranking.find(r => r.name === myName);
-  const rank = myEntry ? data.ranking.indexOf(myEntry) + 1 : 0;
-  const medals = ['🥇','🥈','🥉'];
-  const congrats = ['恭喜獲得第一名！','恭喜獲得第二名！','恭喜獲得第三名！'];
-  document.getElementById('finalMedal').textContent = medals[rank-1] || '🎮';
-  document.getElementById('finalRankText').textContent = rank <= 3 ? congrats[rank-1] : `最終排名：第 ${rank} 名`;
-  document.getElementById('finalScoreNum').textContent = myEntry ? myEntry.score + ' 分' : '0 分';
-  const screen = document.getElementById('screenFinished');
-  screen.className = 'screen' + (rank===1?' bg-gold':rank===2?' bg-silver':rank===3?' bg-bronze':'');
-  if (rank <= 3 && navigator.vibrate) navigator.vibrate([200,100,200,100,400]);
-  showScreen('screenFinished');
+  const myEntry = data.ranking.find(r => r.name === myName); const rank = myEntry ? data.ranking.indexOf(myEntry) + 1 : 0;
+  const medals = ['🥇','🥈','🥉']; const congrats = ['恭喜獲得第一名！','恭喜獲得第二名！','恭喜獲得第三名！'];
+  document.getElementById('finalMedal').textContent = medals[rank-1] || '🎮'; document.getElementById('finalRankText').textContent = rank <= 3 ? congrats[rank-1] : `最終排名：第 ${rank} 名`; document.getElementById('finalScoreNum').textContent = myEntry ? myEntry.score + ' 分' : '0 分';
+  const screen = document.getElementById('screenFinished'); screen.className = 'screen' + (rank===1?' bg-gold':rank===2?' bg-silver':rank===3?' bg-bronze':'');
+  if (rank <= 3 && navigator.vibrate) navigator.vibrate([200,100,200,100,400]); showScreen('screenFinished');
 });
 
-// 當後端發布新的積分排名時，手機端也切換到遊戲結束畫面，但顯示為積分結算
 socket.on('show_rank_points_screen', data => {
-  const myEntry = data.ranking.find(r => r.name === myName);
-  const rank = myEntry ? data.ranking.indexOf(myEntry) + 1 : 0;
-  const medals = ['🥇','🥈','🥉'];
-  const congrats = ['恭喜獲得第一名！','恭喜獲得第二名！','恭喜獲得第三名！'];
-  document.getElementById('finalMedal').textContent = medals[rank-1] || '🏆';
-  document.getElementById('finalRankText').textContent = rank <= 3 ? congrats[rank-1] : `最終名次：第 ${rank} 名`;
-  // 手機端顯示積分
-  document.getElementById('finalScoreNum').textContent = myEntry ? myEntry.score + ' 積分' : '0 積分';
-  const screen = document.getElementById('screenFinished');
-  screen.className = 'screen' + (rank===1?' bg-gold':rank===2?' bg-silver':rank===3?' bg-bronze':'');
-  if (rank <= 3 && navigator.vibrate) navigator.vibrate([200,100,200,100,400]);
-  showScreen('screenFinished');
+  const myEntry = data.ranking.find(r => r.name === myName); const rank = myEntry ? data.ranking.indexOf(myEntry) + 1 : 0;
+  const medals = ['🥇','🥈','🥉']; const congrats = ['恭喜獲得第一名！','恭喜獲得第二名！','恭喜獲得第三名！'];
+  document.getElementById('finalMedal').textContent = medals[rank-1] || '🏆'; document.getElementById('finalRankText').textContent = rank <= 3 ? congrats[rank-1] : `最終名次：第 ${rank} 名`; document.getElementById('finalScoreNum').textContent = myEntry ? myEntry.score + ' 積分' : '0 積分';
+  const screen = document.getElementById('screenFinished'); screen.className = 'screen' + (rank===1?' bg-gold':rank===2?' bg-silver':rank===3?' bg-bronze':'');
+  if (rank <= 3 && navigator.vibrate) navigator.vibrate([200,100,200,100,400]); showScreen('screenFinished');
 });
 
-function restart() {
-  myName = '';
-  localStorage.removeItem('my_table_number');
-  document.getElementById('nameInput').value = '';
-  showScreen('screenLogin');
-}
-
-function setError(msg) {
-  document.getElementById('errorMsg').textContent = msg;
-}
-
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
+function restart() { myName = ''; localStorage.removeItem('my_table_number'); document.getElementById('nameInput').value = ''; showScreen('screenLogin'); }
+function setError(msg) { document.getElementById('errorMsg').textContent = msg; }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 </script>
 </body>
 </html>

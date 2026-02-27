@@ -14,7 +14,6 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: 'Noto Sans TC', sans-serif; display: flex; height: 100vh; overflow: hidden; }
   
-  /* 左側控制面板 */
   .panel { width: 360px; background: var(--surface); padding: 20px; display: flex; flex-direction: column; gap: 20px; overflow-y: auto; border-right: 1px solid #334155; }
   .panel-title { font-size: 1.5rem; font-weight: 900; color: var(--accent); display: flex; align-items: center; justify-content: space-between; }
   
@@ -24,7 +23,6 @@
   .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 1rem; font-weight: 700; cursor: pointer; color: #fff; transition: opacity 0.2s; margin-bottom: 8px; }
   .btn:hover { opacity: 0.9; }
   .btn:active { transform: scale(0.98); }
-  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   
   .btn-primary { background: var(--primary); }
   .btn-accent { background: var(--accent); }
@@ -33,15 +31,12 @@
   .btn-warning { background: var(--yellow); color: #000; }
   .btn-outline { background: transparent; border: 1px solid #64748b; }
   
-  /* 遊戲控制區按鈕群 */
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-  /* 參賽者列表 */
   .player-list { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; }
   .player-item { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; font-size: 0.9rem; }
   .kick-btn { background: rgba(239,68,68,0.2); color: var(--red); border: 1px solid var(--red); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.8rem; }
 
-  /* 右側繪圖區 */
   .workspace { flex: 1; display: flex; flex-direction: column; padding: 20px; gap: 20px; }
   .toolbar { display: flex; align-items: center; gap: 16px; background: var(--surface); padding: 16px; border-radius: 12px; }
   .tool-group { display: flex; align-items: center; gap: 8px; }
@@ -143,17 +138,15 @@
     <canvas id="drawingCanvas" width="800" height="600"></canvas>
     <div id="aiLoading">
       <div class="spinner"></div>
-      <div style="font-size:1.2rem; font-weight:700;">AI 畫家正在施展魔法，請稍候...</div>
-      <div id="aiLoadingText" style="color:#888; margin-top:8px; font-size:0.9rem;">這可能需要 10~30 秒</div>
+      <div style="font-size:1.2rem; font-weight:700;">AI 排隊作畫中，請稍候...</div>
+      <div id="aiLoadingText" style="color:#888; margin-top:8px; font-size:0.9rem;">依據伺服器狀況可能需要 15~40 秒不等</div>
     </div>
   </div>
 </div>
 
 <script>
-// 👇 1. 加入雙通道傳輸與防降級設定
 const socket = io({ transports: ['websocket', 'polling'] });
 
-// --- Socket.IO 連線狀態 ---
 socket.on('connect', () => {
   const badge = document.getElementById('connStatus');
   badge.textContent = '已連線'; badge.style.background = 'var(--green)';
@@ -163,12 +156,11 @@ socket.on('disconnect', () => {
   badge.textContent = '斷線中'; badge.style.background = 'var(--red)';
 });
 
-// --- 遊戲狀態同步 ---
 socket.on('game_state', data => updateUI(data));
 socket.on('show_question', data => {
   document.getElementById('gameStatusLabel').textContent = '畫畫中';
   document.getElementById('qProgressLabel').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
-  clearCanvas(false); // 換題自動清空畫布，不發送廣播避免覆蓋
+  clearCanvas(false); 
 });
 socket.on('start_answering', () => document.getElementById('gameStatusLabel').textContent = '答題中');
 socket.on('show_result', () => document.getElementById('gameStatusLabel').textContent = '顯示解答');
@@ -203,7 +195,6 @@ function kickPlayer(name) {
   if (confirm(`確定要踢出 ${name} 嗎？`)) socket.emit('admin_kick', {name});
 }
 
-// --- CSV 題庫解析 ---
 function uploadCSV() {
   const file = document.getElementById('csvFile').files[0];
   if (!file) return alert('請先選擇 CSV 檔案');
@@ -211,8 +202,6 @@ function uploadCSV() {
   reader.onload = function(e) {
     const text = e.target.result;
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-    // 假設格式: 題目描述, 選項A, 選項B, 選項C, 選項D, 正確解答代號(A/B/C/D)
-    // 略過第一行標題
     const questions = [];
     for (let i = 1; i < lines.length; i++) {
       const parts = lines[i].split(',').map(p => p.trim());
@@ -231,9 +220,8 @@ function uploadCSV() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ questions })
     }).then(r => r.json()).then(res => {
-      if (res.success) {
-        document.getElementById('qStatus').textContent = `✅ 成功載入 ${res.count} 題！`;
-      } else { alert(res.error); }
+      if (res.success) { document.getElementById('qStatus').textContent = `✅ 成功載入 ${res.count} 題！`; } 
+      else { alert(res.error); }
     });
   };
   reader.readAsText(file);
@@ -245,18 +233,14 @@ function resetGame() {
   }
 }
 
-// --- 畫布與繪圖邏輯 (加入節流與壓縮) ---
 const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
 let isDrawing = false;
 let currentX = 0; let currentY = 0;
 let brushColor = '#000000';
 let brushSize = 5;
-
-// 👇 2. 宣告節流時間變數
 let lastEmitTime = 0;
 
-// 初始化畫布白底
 ctx.fillStyle = '#ffffff';
 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -268,92 +252,60 @@ function setColor(color, el) {
 document.getElementById('brushSize').addEventListener('input', e => { brushSize = e.target.value; });
 
 function clearCanvas(broadcast = true) {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  if (broadcast) {
-    socket.emit('clear_canvas');
-    emitCanvas();
-  }
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (broadcast) { socket.emit('clear_canvas'); emitCanvas(); }
 }
 
-// 取得正確座標 (處理 CSS 縮放)
 function getPos(e) {
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width / rect.width;
   const scaleY = canvas.height / rect.height;
   let clientX = e.clientX; let clientY = e.clientY;
-  if (e.touches && e.touches.length > 0) {
-    clientX = e.touches[0].clientX; clientY = e.touches[0].clientY;
-  }
+  if (e.touches && e.touches.length > 0) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
   return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
 }
 
 function startDraw(e) {
-  e.preventDefault();
-  isDrawing = true;
-  const pos = getPos(e);
-  currentX = pos.x; currentY = pos.y;
-  ctx.beginPath();
-  ctx.fillStyle = brushColor;
-  ctx.arc(currentX, currentY, brushSize/2, 0, Math.PI*2);
-  ctx.fill();
+  e.preventDefault(); isDrawing = true;
+  const pos = getPos(e); currentX = pos.x; currentY = pos.y;
+  ctx.beginPath(); ctx.fillStyle = brushColor; ctx.arc(currentX, currentY, brushSize/2, 0, Math.PI*2); ctx.fill();
 }
 
 function draw(e) {
-  if (!isDrawing) return;
-  e.preventDefault();
+  if (!isDrawing) return; e.preventDefault();
   const pos = getPos(e);
-  ctx.beginPath();
-  ctx.moveTo(currentX, currentY);
-  ctx.lineTo(pos.x, pos.y);
-  ctx.strokeStyle = brushColor;
-  ctx.lineWidth = brushSize;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(currentX, currentY); ctx.lineTo(pos.x, pos.y);
+  ctx.strokeStyle = brushColor; ctx.lineWidth = brushSize; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
   currentX = pos.x; currentY = pos.y;
 
-  // 👇 3. 節流邏輯：每 100 毫秒才發送一次，避免塞爆伺服器
   const now = Date.now();
-  if (now - lastEmitTime > 100) {
-    emitCanvas();
-    lastEmitTime = now;
-  }
+  if (now - lastEmitTime > 100) { emitCanvas(); lastEmitTime = now; }
 }
 
 function endDraw(e) {
   if (!isDrawing) return;
-  isDrawing = false;
-  // 👇 4. 畫筆離開時，無條件補發最後一次完整畫面
-  emitCanvas();
+  isDrawing = false; emitCanvas();
 }
 
-// 滑鼠事件
 canvas.addEventListener('mousedown', startDraw);
 canvas.addEventListener('mousemove', draw);
 canvas.addEventListener('mouseup', endDraw);
 canvas.addEventListener('mouseout', endDraw);
-// 觸控事件
 canvas.addEventListener('touchstart', startDraw, {passive:false});
 canvas.addEventListener('touchmove', draw, {passive:false});
 canvas.addEventListener('touchend', endDraw);
 
-// 👇 5. 畫布壓縮：使用 image/webp 並將畫質設為 0.5
 function emitCanvas() {
   const dataURL = canvas.toDataURL('image/webp', 0.5);
   socket.emit('drawing_update', { image: dataURL });
 }
 
-// --- 呼叫 AI 生成圖片 ---
 async function generateAI() {
   const loading = document.getElementById('aiLoading');
   const style = document.getElementById('aiStyle').value;
-  
-  // 為了給 AI 較好的辨識，這張圖用 jpeg 高畫質送出
   const dataURL = canvas.toDataURL('image/jpeg', 0.8);
   
   loading.style.display = 'flex';
-  document.getElementById('aiLoadingText').textContent = '這可能需要幾秒鐘到一分鐘不等...';
 
   try {
     const response = await fetch('/api/diffusion', {
@@ -362,13 +314,7 @@ async function generateAI() {
       body: JSON.stringify({ image: dataURL, style: style })
     });
     const result = await response.json();
-    
-    if (result.error) {
-      alert('產生失敗：' + result.error);
-    } else {
-      // 成功產生，後端會自動廣播 ai_image_generated 給 show.html
-      // 管理員畫面也可以切換顯示
-    }
+    if (result.error) alert('產生失敗：' + result.error);
   } catch (err) {
     alert('發生錯誤：' + err);
   } finally {
