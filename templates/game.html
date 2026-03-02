@@ -240,6 +240,11 @@ let currentPhase = 'screenLogin';
 let timerInterval = null;
 let answeredThisRound = false;
 let pendingResult = null;
+// 💡 絕對防禦 4：重整網頁時，試著把存在手機裡的「得分明細收據」找回來
+try {
+    const savedRes = localStorage.getItem('pending_result');
+    if (savedRes) pendingResult = JSON.parse(savedRes);
+} catch(e) {}
 let currentQIndex = -1; 
 let currentAnswerStartTime = 0;
 
@@ -365,7 +370,8 @@ socket.on('game_reset', () => {
     myName = ''; 
     localStorage.removeItem('my_table_number'); 
     localStorage.removeItem('last_phase'); 
-    localStorage.removeItem('answered_q_index'); // 💡 絕對防禦 3：遊戲重置時，清空答題記憶
+    localStorage.removeItem('answered_q_index'); 
+    localStorage.removeItem('pending_result'); // 💡 遊戲重置，清空收據
     document.getElementById('nameInput').value = ''; 
     clearInterval(timerInterval);
     
@@ -405,6 +411,7 @@ socket.on('join_success', data => {
 socket.on('show_question', data => {
   answeredThisRound = false; 
   pendingResult = null; 
+  localStorage.removeItem('pending_result'); // 💡 新的一題開始，撕掉上一題的明細收據
   clearInterval(timerInterval);
   
   currentQIndex = data.index; // 👇 新增這行：讓 Socket 收到新題目時也同步題號
@@ -508,7 +515,12 @@ function startAnswerTimer(remaining, total) {
   timerInterval = setInterval(tick, 200);
 }
 
-socket.on('answer_result', data => { clearInterval(timerInterval); pendingResult = data; showScreen('screenWaitResult'); });
+socket.on('answer_result', data => { 
+    clearInterval(timerInterval); 
+    pendingResult = data; 
+    localStorage.setItem('pending_result', JSON.stringify(data)); // 💡 收到收據的瞬間，立刻存進手機儲存空間
+    showScreen('screenWaitResult'); 
+});
 
 socket.on('show_result', data => {
   clearInterval(timerInterval);
