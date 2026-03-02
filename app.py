@@ -393,8 +393,12 @@ def on_drawing_update(data):
 
 @socketio.on('submit_answer')
 def on_submit_answer(data):
-    uid = get_uid_by_sid(request.sid)
-    if not uid or game_state['status'] != 'answering' or game_state['participants'][uid]['answered']: return
+    uid = data.get('uid')
+    if not uid:
+        uid = next((k for k, v in game_state['participants'].items() if v['sid'] == request.sid), None)
+        
+    if not uid or uid not in game_state['participants'] or game_state['status'] != 'answering':
+        return
 
     p = game_state['participants'][uid]
     p['answered'] = True

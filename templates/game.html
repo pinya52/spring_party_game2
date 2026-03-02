@@ -241,6 +241,7 @@ let timerInterval = null;
 let answeredThisRound = false;
 let pendingResult = null;
 let currentQIndex = -1; 
+let currentAnswerStartTime = 0;
 
 window.onload = () => {
   const savedNumber = localStorage.getItem('my_table_number');
@@ -430,23 +431,34 @@ function renderOptionsUI(options) {
 function selectAnswer(letter, el) {
   if (answeredThisRound) return;
   answeredThisRound = true;
-  const timeFill = document.getElementById('aTimerFill');
-  const pct = parseFloat(timeFill.style.width);
-  const total = 20; const time_taken = ((100 - pct) / 100) * total;
+  
+  // 💡 真實時間計算：不受鎖定螢幕或動畫卡頓影響
+  let time_taken = (Date.now() - currentAnswerStartTime) / 1000;
+  
+  // 防呆：確保時間在 0 到 20 秒的合理範圍內
+  if (time_taken < 0) time_taken = 0;
+  if (time_taken > 20) time_taken = 20;
+
   document.querySelectorAll('.option-btn').forEach(b => { if (b !== el) b.classList.add('disabled'); });
   el.classList.add('selected');
+  
   if (navigator.vibrate) navigator.vibrate(40);
-  socket.emit('submit_answer', { answer: letter, time_taken });
+  
+  // 送出答案與精準的時間，並附上桌號
+  const savedNumber = localStorage.getItem('my_table_number');
+  socket.emit('submit_answer', { answer: letter, time_taken: time_taken, uid: savedNumber });
+  
   clearInterval(timerInterval);
   showScreen('screenWaitResult');
 }
-
 // 💡支援接收 (剩餘時間, 總時間) 來計算正確的長度
 function startAnswerTimer(remaining, total) {
   clearInterval(timerInterval);
+  
+  // 💡 記錄倒數開始的真實時間（若中途重連，會自動扣掉已流失的時間）
+  currentAnswerStartTime = Date.now() - ((total - remaining) * 1000);
+  
   let currentRem = remaining;
-  const fill = document.getElementById('aTimerFill'); 
-  const num = document.getElementById('aTimerNum'); 
   
   function tick() {
     num.textContent = currentRem; 
