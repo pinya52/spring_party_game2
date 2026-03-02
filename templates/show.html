@@ -112,7 +112,8 @@
   <img src="/static/game_qr.png" alt="Game QR Code" onerror="this.style.display='none'" style="width: 15vw; height: 15vw; border-radius: 16px; border: 4px solid var(--accent); box-shadow: 0 0 40px rgba(168,85,247,0.4); margin-bottom: 20px; z-index: 1;">
   <div style="font-size: 1.4vw; max-width: 60vw; text-align: center; line-height: 1.6; color: #ccc; margin-bottom: 30px; z-index: 1;">
     掃描上方 QR Code 並輸入桌號加入遊戲！<br>
-    每題將會顯示原創畫作或 <span style="color: var(--accent); font-weight: bold;">AI 增強畫作</span>，請在時間內精準選出正確的題目！
+    每題將會邀請中二級主管接力畫出題目答案，並會在大螢幕上顯示原創畫作或 <span style="color: var(--accent); font-weight: bold;">AI 增強畫作</span><br>
+    請在盡快在時間內精準選出正確的題目，以獲得更高的分數！
   </div>
   <div class="participant-count" id="wCount">0 / 20 位參賽者</div>
   <div class="waiting-participants" id="wParticipants"></div>
@@ -410,6 +411,11 @@ function startFireworks() {
     requestAnimationFrame(loop);
   }
   loop(); setTimeout(() => clearInterval(burstInterval), 15000);
+
+  // 👇 新增：當收到後端廣播「重置遊戲」時，大螢幕直接重新載入，回到初始等待畫面
+  socket.on('game_reset', () => {
+      window.location.reload();
+  });
 }
 </script>
 </body>
