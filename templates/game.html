@@ -250,39 +250,62 @@ window.onload = () => {
   }
 };
 
-// 💡新增：把 polling 抽出獨立的 function，方便馬上呼叫
-// 💡 修改：補上 uid 參數，並加入 personal_answered 的判斷
+// 💡 修正：強化背景喚醒與極速同步邏輯
 async function fetchGameState() {
   const savedNumber = localStorage.getItem('my_table_number');
-  if (!savedNumber) return; // 確保有桌號才發送請求
-  
+  if (!savedNumber) return; 
+
   try {
-    // 1. 網址加上 ?uid=桌號，讓後端知道是誰在問進度
+    // 必須加上 ?uid=桌號，才能讓後台精準判斷你這題到底答過沒
     const res = await fetch(`/api/get-game-state?uid=${savedNumber}`);
     const data = await res.json();
-    
+
+    // 狀態 1：開放答題階段
     if (data.phase === 'answering') {
-        // 2. 根據後端回傳的狀態，判斷你是否真的已經答過題了
         if (data.personal_answered) {
+            // 後台判定：你已經答過了
             answeredThisRound = true;
-            // 如果已經答過，直接顯示等待結果，絕對不顯示按鈕
             if (currentPhase !== 'screenWaitResult' && currentPhase !== 'screenResult') {
                 showScreen('screenWaitResult');
             }
-        } 
-        // 3. 只有在真的還沒答題時，才顯示選項畫面
-        else if (currentPhase !== 'screenAnswering' && currentPhase !== 'screenWaitResult' && !answeredThisRound) {
-            showScreen('screenAnswering');
-            if (data.question && document.getElementById('optionsCol').innerHTML === '') {
-                renderOptionsUI(data.question.options);
+        } else {
+            // 🚀 關鍵修復：後台判定你【還沒答題】！
+            // 強制重置前端防呆變數，避免因為鎖屏導致判定殘留
+            answeredThisRound = false; 
+            pendingResult = null;
+            
+            // 如果畫面卡在別的地方，立刻切換到答題畫面並校正計時器
+            if (currentPhase !== 'screenAnswering') {
+                showScreen('screenAnswering');
+                if (data.question) renderOptionsUI(data.question.options);
+                // 使用後台回傳的剩餘時間，避免鎖屏導致時間暫停算錯分數
+                startAnswerTimer(data.remaining_time !== undefined ? data.remaining_time : 20, data.duration || 20);
+            } else if (document.getElementById('optionsCol').innerHTML === '') {
+                // 如果人在答題畫面，但選項沒生出來，補繪製
+                if (data.question) renderOptionsUI(data.question.options);
             }
-            startAnswerTimer(data.remaining_time !== undefined ? data.remaining_time : 20, data.duration || 20);
         }
-    } else if (data.phase === 'waiting' && currentPhase !== 'screenWaiting' && currentPhase !== 'screenLogin') {
+    } 
+    // 狀態 2：繪圖 / 題目提示階段
+    else if (data.phase === 'question' || data.phase === 'started') {
+        if (currentPhase !== 'screenDrawing' && currentPhase !== 'screenQuestion') {
+            showScreen('screenDrawing');
+        }
+    } 
+    // 狀態 3：等待階段
+    else if (data.phase === 'waiting' && currentPhase !== 'screenWaiting' && currentPhase !== 'screenLogin') {
         showScreen('screenWaiting');
     }
   } catch (err) { console.error('Polling error', err); }
 }
+
+// 🚀 關鍵修復 2：監聽手機螢幕「解鎖 / 喚醒」事件
+// 當你打開手機螢幕的瞬間 (0毫秒)，立刻向後台要最新狀態，不要等 1 秒的 setInterval
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        fetchGameState();
+    }
+});
 
 // 💡修改：把原本的 setInterval 換成呼叫獨立 function，並將頻率加速至 1 秒
 setInterval(fetchGameState, 1000);
