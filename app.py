@@ -166,6 +166,9 @@ def api_state():
 # 👇 新增：給手機端短輪詢 (Polling) 防漏接收的 API
 @app.route('/api/get-game-state')
 def api_get_game_state():
+    # 💡 1. 取得前端傳來的桌號
+    uid = request.args.get('uid') 
+    
     q_data = None
     if game_state['status'] in ['question', 'answering', 'result'] and game_state['questions'] and game_state['current_question'] < len(game_state['questions']):
         q = _current_question()
@@ -177,19 +180,24 @@ def api_get_game_state():
             'correct': q['correct'] if game_state['status'] == 'result' else None
         }
     
-    # 💡計算剩餘時間
+    # 計算剩餘時間
     rem = 0
     if game_state['status'] == 'answering':
         rem = max(0, int(game_state.get('answer_duration', 20) - (time.time() - game_state.get('answer_start_time', time.time()))))
 
+    # 💡 2. 判斷該玩家是否已經答題
+    personal_answered = False
+    if uid and uid in game_state['participants']:
+        personal_answered = game_state['participants'][uid].get('answered', False)
+
     return jsonify({
         'phase': game_state['status'],
-        # 💡將原本的 'imageData': ... 這一行整行刪除！(因為手機端根本不需要圖片，這就是造成卡頓的元兇)
+        'personal_answered': personal_answered, # 💡 3. 將答題狀態回傳給前端，前端才知道要鎖住畫面
         'players': _get_full_ranking(),
         'question': q_data,
         'remaining_time': rem,
         'duration': game_state.get('answer_duration', 20)
-    })  
+    })
 
 @app.route('/api/upload_questions', methods=['POST'])
 def upload_questions():
@@ -394,16 +402,18 @@ def on_drawing_update(data):
 @socketio.on('submit_answer')
 def on_submit_answer(data):
     uid = data.get('uid')
-    print(uid)
     if not uid:
         uid = next((k for k, v in game_state['participants'].items() if v['sid'] == request.sid), None)
         
-    print(uid)
     if not uid or uid not in game_state['participants'] or game_state['status'] != 'answering':
-        print('crap')
         return
 
     p = game_state['participants'][uid]
+    
+    # 💡 關鍵防呆：如果這個人這回合已經答過題了，直接拒絕！不給改答案、不給重複計分！
+    if p.get('answered', False):
+        return
+        
     p['answered'] = True
     q = _current_question()
     correct = (data.get('answer') == q['correct'])

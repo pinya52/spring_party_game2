@@ -264,8 +264,15 @@ async function fetchGameState() {
     // 🚀 關鍵修復 1：利用題號判斷是不是「新的一題」
     if (data.question && data.question.index !== currentQIndex) {
         currentQIndex = data.question.index;
-        answeredThisRound = false; // 只有遇到新題目，才允許重置答題狀態
-        pendingResult = null;
+        
+        // 💡 絕對防禦 2：重整後，檢查這題是不是在「已答過」的名單裡
+        const savedAnsIndex = parseInt(localStorage.getItem('answered_q_index'), 10);
+        if (currentQIndex === savedAnsIndex) {
+            answeredThisRound = true; // 抓到了！你想重整再答一次！強制鎖定
+        } else {
+            answeredThisRound = false; // 題號不同，真的是新的一題，才放行
+            pendingResult = null;
+        }
     }
 
     // 狀態 1：開放答題階段
@@ -353,15 +360,15 @@ socket.on('kicked', () => {
   setError(''); showToast('您已被管理員移除，請重新輸入桌號'); showScreen('screenLogin');
 });
 
-// 👇 新增：收到重置遊戲指令時，徹底清空紀錄並踢回登入畫面
+// 👇 修正：收到重置遊戲指令時，徹底清空紀錄並踢回登入畫面
 socket.on('game_reset', () => { 
     myName = ''; 
     localStorage.removeItem('my_table_number'); 
     localStorage.removeItem('last_phase'); 
+    localStorage.removeItem('answered_q_index'); // 💡 絕對防禦 3：遊戲重置時，清空答題記憶
     document.getElementById('nameInput').value = ''; 
-    clearInterval(timerInterval); // 停止任何可能還在跑的計時器
+    clearInterval(timerInterval);
     
-    // 顯示提示並回到登入畫面
     showToast('遊戲已重置，請重新加入');
     showScreen('screenLogin'); 
 });
@@ -433,7 +440,10 @@ function selectAnswer(letter, el) {
   if (answeredThisRound) return;
   answeredThisRound = true;
   
-  // 💡 真實時間計算：不受鎖定螢幕或動畫卡頓影響
+  // 💡 絕對防禦 1：交卷的瞬間，把「這題的題號」死死記在手機裡！
+  localStorage.setItem('answered_q_index', currentQIndex);
+  
+  // 真實時間計算：不受鎖定螢幕或動畫卡頓影響
   let time_taken = (Date.now() - currentAnswerStartTime) / 1000;
   
   // 防呆：確保時間在 0 到 20 秒的合理範圍內
