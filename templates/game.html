@@ -240,6 +240,7 @@ let currentPhase = 'screenLogin';
 let timerInterval = null;
 let answeredThisRound = false;
 let pendingResult = null;
+let currentQIndex = -1; 
 
 window.onload = () => {
   const savedNumber = localStorage.getItem('my_table_number');
@@ -250,38 +251,39 @@ window.onload = () => {
   }
 };
 
-// 💡 修正：強化背景喚醒與極速同步邏輯
+// 💡 修正：強化背景喚醒與極速同步邏輯，加入題號防呆
 async function fetchGameState() {
   const savedNumber = localStorage.getItem('my_table_number');
   if (!savedNumber) return; 
 
   try {
-    // 必須加上 ?uid=桌號，才能讓後台精準判斷你這題到底答過沒
     const res = await fetch(`/api/get-game-state?uid=${savedNumber}`);
     const data = await res.json();
 
+    // 🚀 關鍵修復 1：利用題號判斷是不是「新的一題」
+    if (data.question && data.question.index !== currentQIndex) {
+        currentQIndex = data.question.index;
+        answeredThisRound = false; // 只有遇到新題目，才允許重置答題狀態
+        pendingResult = null;
+    }
+
     // 狀態 1：開放答題階段
     if (data.phase === 'answering') {
-        if (data.personal_answered) {
-            // 後台判定：你已經答過了
+        // 🚀 關鍵修復 2：只要前端已經自己標記答過 (answeredThisRound) 或是後端確認答過，就乖乖待在等待畫面
+        if (data.personal_answered || answeredThisRound) {
             answeredThisRound = true;
             if (currentPhase !== 'screenWaitResult' && currentPhase !== 'screenResult') {
                 showScreen('screenWaitResult');
             }
         } else {
-            // 🚀 關鍵修復：後台判定你【還沒答題】！
-            // 強制重置前端防呆變數，避免因為鎖屏導致判定殘留
-            answeredThisRound = false; 
-            pendingResult = null;
-            
-            // 如果畫面卡在別的地方，立刻切換到答題畫面並校正計時器
+            // 真的還沒答題，才顯示選項畫面
             if (currentPhase !== 'screenAnswering') {
                 showScreen('screenAnswering');
-                if (data.question) renderOptionsUI(data.question.options);
-                // 使用後台回傳的剩餘時間，避免鎖屏導致時間暫停算錯分數
+                if (data.question) {
+                    renderOptionsUI(data.question.options);
+                }
                 startAnswerTimer(data.remaining_time !== undefined ? data.remaining_time : 20, data.duration || 20);
             } else if (document.getElementById('optionsCol').innerHTML === '') {
-                // 如果人在答題畫面，但選項沒生出來，補繪製
                 if (data.question) renderOptionsUI(data.question.options);
             }
         }
@@ -392,7 +394,12 @@ socket.on('join_success', data => {
 });
 
 socket.on('show_question', data => {
-  answeredThisRound = false; pendingResult = null; clearInterval(timerInterval);
+  answeredThisRound = false; 
+  pendingResult = null; 
+  clearInterval(timerInterval);
+  
+  currentQIndex = data.index; // 👇 新增這行：讓 Socket 收到新題目時也同步題號
+  
   showScreen('screenQuestion');
   document.getElementById('phoneQNum').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
   document.getElementById('phoneQText').textContent = data.description;
