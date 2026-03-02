@@ -187,12 +187,16 @@ def api_get_game_state():
 
     # 💡 2. 判斷該玩家是否已經答題
     personal_answered = False
+    last_receipt = None
     if uid and uid in game_state['participants']:
-        personal_answered = game_state['participants'][uid].get('answered', False)
+        p = game_state['participants'][uid]
+        personal_answered = p.get('answered', False)
+        last_receipt = p.get('last_receipt') # 💡 終極防禦 2：取出備份收據
 
     return jsonify({
         'phase': game_state['status'],
-        'personal_answered': personal_answered, # 💡 3. 將答題狀態回傳給前端，前端才知道要鎖住畫面
+        'personal_answered': personal_answered, 
+        'last_receipt': last_receipt, # 💡 終極防禦 3：將收據一併傳給手機
         'players': _get_full_ranking(),
         'question': q_data,
         'remaining_time': rem,
@@ -438,11 +442,15 @@ def on_submit_answer(data):
     ranking = _get_full_ranking()
     my_rank = next((i+1 for i, r in enumerate(ranking) if r['name'] == p['name']), 0)
 
-    emit('answer_result', {
+    # 💡 終極防禦 1：把這題的「得分收據」備份存進後台該玩家的名單裡！
+    receipt = {
         'correct': correct, 'correct_answer': q['correct'], 'base_score': base,
         'time_bonus': time_bonus, 'streak_bonus': streak_bonus, 'total_gain': total_gain,
         'total_score': p['score'], 'rank': my_rank, 'streak': p['streak'],
-    })
+    }
+    p['last_receipt'] = receipt
+
+    emit('answer_result', receipt)
 
     joined_p = game_state['participants'].values()
     answered_count = sum(1 for v in joined_p if v['answered'])

@@ -266,6 +266,12 @@ async function fetchGameState() {
     const res = await fetch(`/api/get-game-state?uid=${savedNumber}`);
     const data = await res.json();
 
+    // 💡 終極防禦 4：只要後台有傳來這題的備份收據，強制蓋過前端的變數！解決重整遺失的問題
+    if (data.last_receipt) {
+        pendingResult = data.last_receipt;
+        localStorage.setItem('pending_result', JSON.stringify(pendingResult));
+    }
+
     // 🚀 關鍵修復 1：利用題號判斷是不是「新的一題」
     if (data.question && data.question.index !== currentQIndex) {
         currentQIndex = data.question.index;
