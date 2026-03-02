@@ -245,7 +245,7 @@ function uploadCSV() {
     const text = e.target.result;
     const lines = text.split('\n').map(l => l.trim()).filter(l => l);
     const questions = [];
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = 0; i < lines.length; i++) {
       const parts = lines[i].split(',').map(p => p.trim());
       if (parts.length >= 6) {
         questions.push({

@@ -251,18 +251,33 @@ window.onload = () => {
 };
 
 // 💡新增：把 polling 抽出獨立的 function，方便馬上呼叫
+// 💡 修改：補上 uid 參數，並加入 personal_answered 的判斷
 async function fetchGameState() {
-  if (!myName) return;
+  const savedNumber = localStorage.getItem('my_table_number');
+  if (!savedNumber) return; // 確保有桌號才發送請求
+  
   try {
-    const res = await fetch('/api/get-game-state');
+    // 1. 網址加上 ?uid=桌號，讓後端知道是誰在問進度
+    const res = await fetch(`/api/get-game-state?uid=${savedNumber}`);
     const data = await res.json();
-    if (data.phase === 'answering' && currentPhase !== 'screenAnswering' && currentPhase !== 'screenWaitResult' && !answeredThisRound) {
-        showScreen('screenAnswering');
-        if (data.question && document.getElementById('optionsCol').innerHTML === '') {
-            renderOptionsUI(data.question.options);
+    
+    if (data.phase === 'answering') {
+        // 2. 根據後端回傳的狀態，判斷你是否真的已經答過題了
+        if (data.personal_answered) {
+            answeredThisRound = true;
+            // 如果已經答過，直接顯示等待結果，絕對不顯示按鈕
+            if (currentPhase !== 'screenWaitResult' && currentPhase !== 'screenResult') {
+                showScreen('screenWaitResult');
+            }
+        } 
+        // 3. 只有在真的還沒答題時，才顯示選項畫面
+        else if (currentPhase !== 'screenAnswering' && currentPhase !== 'screenWaitResult' && !answeredThisRound) {
+            showScreen('screenAnswering');
+            if (data.question && document.getElementById('optionsCol').innerHTML === '') {
+                renderOptionsUI(data.question.options);
+            }
+            startAnswerTimer(data.remaining_time !== undefined ? data.remaining_time : 20, data.duration || 20);
         }
-        // 💡使用伺服器精準的剩餘時間
-        startAnswerTimer(data.remaining_time !== undefined ? data.remaining_time : 20, data.duration || 20);
     } else if (data.phase === 'waiting' && currentPhase !== 'screenWaiting' && currentPhase !== 'screenLogin') {
         showScreen('screenWaiting');
     }
@@ -309,6 +324,19 @@ socket.on('rename_ok', () => {
 socket.on('kicked', () => {
   myName = ''; localStorage.removeItem('my_table_number'); document.getElementById('nameInput').value = '';
   setError(''); showToast('您已被管理員移除，請重新輸入桌號'); showScreen('screenLogin');
+});
+
+// 👇 新增：收到重置遊戲指令時，徹底清空紀錄並踢回登入畫面
+socket.on('game_reset', () => { 
+    myName = ''; 
+    localStorage.removeItem('my_table_number'); 
+    localStorage.removeItem('last_phase'); 
+    document.getElementById('nameInput').value = ''; 
+    clearInterval(timerInterval); // 停止任何可能還在跑的計時器
+    
+    // 顯示提示並回到登入畫面
+    showToast('遊戲已重置，請重新加入');
+    showScreen('screenLogin'); 
 });
 
 socket.on('join_error', data => setError(data.message));
