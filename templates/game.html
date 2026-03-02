@@ -283,10 +283,11 @@ async function fetchGameState() {
                 if (data.question) {
                     renderOptionsUI(data.question.options);
                 }
-                startAnswerTimer(data.remaining_time !== undefined ? data.remaining_time : 20, data.duration || 20);
             } else if (document.getElementById('optionsCol').innerHTML === '') {
                 if (data.question) renderOptionsUI(data.question.options);
             }
+
+            startAnswerTimer(data.remaining_time !== undefined ? data.remaining_time : 20, data.duration || 20);
         }
     } 
     // 狀態 2：繪圖 / 題目提示階段
@@ -452,34 +453,49 @@ function selectAnswer(letter, el) {
   showScreen('screenWaitResult');
 }
 // 💡支援接收 (剩餘時間, 總時間) 來計算正確的長度
+// 💡 關鍵修正 2：改用 Date.now() 算時間，不依賴 setInterval 次數，徹底解決鎖屏暫停問題
 function startAnswerTimer(remaining, total) {
   clearInterval(timerInterval);
   
-  // 💡 記錄倒數開始的真實時間（若中途重連，會自動扣掉已流失的時間）
+  // 記錄倒數開始的真實時間
   currentAnswerStartTime = Date.now() - ((total - remaining) * 1000);
   
-  let currentRem = remaining;
+  const fill = document.getElementById('aTimerFill'); 
+  const num = document.getElementById('aTimerNum');
+  let lastVib = -1; // 避免震動異常重疊
   
   function tick() {
-    num.textContent = currentRem; 
-    fill.style.width = ((currentRem / total) * 100) + '%';
-    
-    if (currentRem <= 5) { fill.style.background = '#ef4444'; num.className = 'answer-timer-num red'; if (navigator.vibrate && currentRem > 0) navigator.vibrate(50); } 
-    else if (currentRem <= 10) { fill.style.background = '#f97316'; num.className = 'answer-timer-num orange'; } 
-    else { fill.style.background = '#3b82f6'; num.className = 'answer-timer-num'; }
+    // 每次執行都重新拿「現在的真實時間」去減掉「開始時間」，絕對不會被鎖屏卡住
+    const elapsed = (Date.now() - currentAnswerStartTime) / 1000;
+    let currentRem = Math.ceil(total - elapsed);
+    if (currentRem < 0) currentRem = 0;
+
+    if (num && fill) {
+        num.textContent = currentRem; 
+        fill.style.width = ((currentRem / total) * 100) + '%';
+        
+        if (currentRem <= 5) { 
+            fill.style.background = '#ef4444'; 
+            num.className = 'answer-timer-num red'; 
+            // 震動提示防呆
+            if (navigator.vibrate && currentRem > 0 && currentRem !== lastVib) { 
+                navigator.vibrate(50); 
+                lastVib = currentRem; 
+            } 
+        } 
+        else if (currentRem <= 10) { fill.style.background = '#f97316'; num.className = 'answer-timer-num orange'; } 
+        else { fill.style.background = '#3b82f6'; num.className = 'answer-timer-num'; }
+    }
     
     if (currentRem <= 0) { 
         clearInterval(timerInterval);
-        // 💡 如果時間到且還沒回答，雖然沒得分，但要跳轉到結果頁面
-        if (!answeredThisRound) {
-            showScreen('screenWaitResult'); 
-        }
-        return; 
+        if (!answeredThisRound) showScreen('screenWaitResult'); 
     }
-    currentRem--;
   }
+  
   tick(); 
-  timerInterval = setInterval(tick, 1000);
+  // 提高刷新頻率到 200 毫秒，這樣就算被背景限制，一喚醒也能在 0.2 秒內瞬間對齊時間
+  timerInterval = setInterval(tick, 200);
 }
 
 socket.on('answer_result', data => { clearInterval(timerInterval); pendingResult = data; showScreen('screenWaitResult'); });
