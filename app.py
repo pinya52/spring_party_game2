@@ -520,7 +520,7 @@ def on_admin_show_final_total():
     final_combined = []
     # 遍歷 1-18 桌 (對應您最新的桌數設定)
     for i in range(1, 19):
-        name = f"第{i:02d}桌"
+        name = f"{i:02d}桌"
         # 從全域變數 historical_scores 取得上傳的 CSV 分數
         h_score = historical_scores.get(name, 0)
         # 從剛剛計算的對應表取得本場積分
