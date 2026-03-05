@@ -124,6 +124,17 @@
       <button class="btn btn-accent" onclick="socket.emit('admin_next_question')">⏭️ 下一題</button>
       <button class="btn btn-warning" onclick="socket.emit('admin_show_rank_points')">🏅 顯示名次積分</button>
     </div>
+
+    <div class="card">
+      <div class="card-title">1.5 歷史積分管理 (scoring.csv)</div>
+      <input type="file" id="scoringCsvFile" accept=".csv" style="margin-bottom:8px; width:100%; color:#888;">
+      <button class="btn btn-outline" onclick="uploadScoringCSV()">上傳歷史積分</button>
+      <div id="sStatus" style="font-size:0.85rem; color:var(--green); margin-top:8px;"></div>
+    </div>
+
+    <button class="btn btn-danger" onclick="socket.emit('admin_show_final_total')" style="background: #be185d; margin-top: 8px;">
+        🏆 顯示年度總結算 (含 CSV 積分)
+    </button>
   </div>
 
   <div class="card">
@@ -398,6 +409,30 @@ async function generateAI() {
   } finally {
     loading.style.display = 'none';
   }
+}
+
+function uploadScoringCSV() {
+  const file = document.getElementById('scoringCsvFile').files[0];
+  if (!file) return alert('請先選擇 scoring.csv 檔案');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l);
+    const scores = lines.map(line => {
+      const parts = line.split(',');
+      return { name: parts[0], score: parseInt(parts[1]) || 0 };
+    });
+    
+    fetch('/api/upload_scoring', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scores })
+    }).then(r => r.json()).then(res => {
+      if (res.success) {
+        document.getElementById('sStatus').textContent = `✅ 成功載入 ${res.count} 桌歷史積分！`;
+      }
+    });
+  };
+  reader.readAsText(file);
 }
 </script>
 </body>

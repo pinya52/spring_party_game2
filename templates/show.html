@@ -68,7 +68,7 @@
   .option-box.correct { filter: brightness(1.4); border-width: 4px; }
   .option-letter { font-family: 'Space Mono', monospace; font-size: 1.4vw; }
 
-  /* ── RESULT 單題排行榜 (更新為 4 欄網格以容納 19 人) ── */
+  /* ── RESULT 單題排行榜 (更新為 4 欄網格以容納 18 人) ── */
   #screenResult { background: #050508; justify-content: flex-start; padding-top: 5vh; }
   .result-title { font-family: 'Bebas Neue', sans-serif; font-size: 4vw; color: var(--accent); letter-spacing: 0.05em; margin-bottom: 10px; }
   .ranking-grid { width: 90vw; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 20px; }
@@ -115,7 +115,7 @@
     每題將會邀請中二級主管接力畫出題目答案，並會在大螢幕上顯示原創畫作或 <span style="color: var(--accent); font-weight: bold;">AI 增強畫作</span><br>
     請在盡快在時間內精準選出正確的題目，以獲得更高的分數！
   </div>
-  <div class="participant-count" id="wCount">0 / 19 位參賽者</div>
+  <div class="participant-count" id="wCount">0 / 18 位參賽者</div>
   <div class="waiting-participants" id="wParticipants"></div>
 </div>
 
@@ -308,7 +308,7 @@ socket.on('show_result', data => {
     
     label.textContent = `✅ 正確答案：${data.correct_text ? `${correct}: ${data.correct_text}` : correct}`;
     
-    // 渲染全 19 桌的本題成績網格
+    // 渲染全 18 桌的本題成績網格
     grid.innerHTML = data.ranking.map((r,i) => `
       <div class="rank-row ${classes[i] || ''}">
         <span class="rank-num">${medals[i] || '#' + (i+1)}</span>
@@ -338,7 +338,7 @@ function renderFinishedRanking(ranking, isRankPoints = false) {
   let processedRanking = isRankPoints ? calculateRankPoints(ranking) : ranking.map((p, i) => ({...p, displayRank: i + 1, rankPoints: p.score}));
   
   const top3 = processedRanking.slice(0, 3);
-  const rest = processedRanking.slice(3, 19); 
+  const rest = processedRanking.slice(3, 18); 
   
   const podium = document.getElementById('finalPodium');
   const order = [top3[1], top3[0], top3[2]].filter(Boolean);
@@ -383,7 +383,7 @@ socket.on('show_rank_points_screen', data => {
 
 function renderParticipants(list, count) {
   // 💡修改：只要登入過的都算入準備就緒，不論他當下是否剛好斷線重整
-  document.getElementById('wCount').textContent = `${list.length} / 19 桌已就緒`;
+  document.getElementById('wCount').textContent = `${list.length} / 18 桌已就緒`;
   const sorted = [...list].sort((a, b) => parseInt(a.name) - parseInt(b.name));
   document.getElementById('wParticipants').innerHTML = sorted.map(p => `<div class="w-participant">${p.name}</div>`).join('');
 }
@@ -417,6 +417,48 @@ function startFireworks() {
       window.location.reload();
   });
 }
+
+// 在 show.html 的 <script> 區塊新增監聽
+socket.on('show_final_grand_total', data => {
+  showScreen('screenFinished');
+  document.getElementById('finishedTitle').textContent = '🏆 年度總積分結算 🏆';
+  
+  const podium = document.getElementById('finalPodium');
+  const restContainer = document.getElementById('restRanking');
+  
+  // 處理前三名頒獎台
+  const top3 = data.ranking.slice(0, 3);
+  const order = [top3[1], top3[0], top3[2]].filter(Boolean);
+  const classes = ['second','first','third'];
+  
+  podium.innerHTML = order.map((p, i) => {
+    const cls = classes[i];
+    return `
+      <div class="podium-item">
+        <div class="podium-name">${p.name}</div>
+        <div class="podium-score score-pop">${p.total_score} 總積分</div>
+        <div style="font-size:0.9vw; color:#888; margin-bottom:10px;">
+          (歷史 ${p.historical_score} + 本場 ${p.current_game_score})
+        </div>
+        <div class="podium-block ${cls} ${cls==='first'?'blink':''}">${['🥈','🥇','🥉'][i]}</div>
+      </div>`;
+  }).join('');
+
+  // 處理 4-19 名清單
+  const rest = data.ranking.slice(3, 19);
+  restContainer.innerHTML = rest.map((p, i) => `
+    <div class="rest-item">
+      <span class="rest-rank-num">#${i + 4}</span>
+      <span class="rest-name">${p.name}</span>
+      <div style="text-align:right">
+        <span class="rest-score score-pop">${p.total_score} 總分</span>
+        <div style="font-size:0.8vw; color:#666;">H:${p.historical_score} + C:${p.current_game_score}</div>
+      </div>
+    </div>
+  `).join('');
+  
+  startFireworks(); // 播放慶祝特效
+});
 </script>
 </body>
 </html>

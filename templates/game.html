@@ -162,7 +162,7 @@
   <div class="logo-sub">多人線上猜圖遊戲</div>
   <div class="conn-indicator"><div class="dot" id="connDot"></div><span id="connText">連線中...</span></div>
   <div class="login-card">
-    <div class="login-label">輸入您的桌號（01–19）</div>
+    <div class="login-label">輸入您的桌號（01–18）</div>
     <input type="text" id="nameInput" placeholder="例如：05" maxlength="2" autocomplete="off" inputmode="numeric" pattern="[0-9]*" style="font-size:2rem;text-align:center;letter-spacing:0.3em;font-family:'Space Mono',monospace;">
     <div style="font-size:0.78rem;color:var(--muted);margin-bottom:14px;text-align:center;">輸入後名稱將顯示為「05桌」</div>
     <button class="btn-join" onclick="joinGame()">加入遊戲 →</button>
@@ -350,7 +350,7 @@ socket.on('disconnect', () => {
 function joinGame() {
   const raw = document.getElementById('nameInput').value.trim();
   if (!raw) { setError('請輸入桌號'); return; }
-  if (!/^(0[1-9]|1[0-9])$/.test(raw)) { setError('請輸入 01–19 之間的數字（例如：05）'); return; }
+  if (!/^(0[1-9]|1[0-8])$/.test(raw)) { setError('請輸入 01–18 之間的數字（例如：05）'); return; }
   setError('');
   localStorage.setItem('my_table_number', raw);
   socket.emit('join_game', { number: raw });
@@ -550,7 +550,7 @@ socket.on('show_result', data => {
 });
 
 // ==========================================
-// 🏆 1-19 積分排行榜與頒獎台邏輯
+// 🏆 1-18 積分排行榜與頒獎台邏輯
 // ==========================================
 socket.on('show_rank_points_screen', data => {
   renderLeaderboard(data.ranking); // data.ranking 為帶有原始 score 與 joined 狀態的資料

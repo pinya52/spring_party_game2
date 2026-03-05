@@ -26,6 +26,8 @@ socketio = SocketIO(
     engineio_logger=False
 )
 
+historical_scores = {}
+
 game_state = {
     'status': 'waiting',
     'questions': [],
@@ -40,7 +42,7 @@ game_state = {
     'answer_duration': 20   # 新增總時間長度
 }
 
-MAX_PARTICIPANTS = 20
+MAX_PARTICIPANTS = 19
 MAX_QUESTIONS = 50
 
 def optimize_image_for_transfer(img, max_size=600, quality=75):
@@ -137,7 +139,7 @@ def _get_full_ranking():
     current_players = {v['name']: v['score'] for v in game_state['participants'].values()}
     full_list = []
     
-    for i in range(1, 20):
+    for i in range(1, 19):
         name = f"{i:02d}桌"
         score = current_players.get(name, 0)
         full_list.append({'name': name, 'score': score})
@@ -257,7 +259,7 @@ def on_join_game(data):
     number = data.get('number', '').strip()
     sid = request.sid
     if not re.match(r'^(0[1-9]|1[0-9])$', number):
-        emit('join_error', {'message': '請輸入 01–19 之間的數字'}); return
+        emit('join_error', {'message': '請輸入 01–18 之間的數字'}); return
     
     uid = number
     name = number + '桌'
@@ -478,6 +480,52 @@ def _show_question():
     game_state['status'] = 'question'
     q = _current_question()
     socketio.emit('show_question', {'index': game_state['current_question'], 'total': len(game_state['questions']), 'description': q['description'], 'options': q['options']})
+
+# 在 app.py 的路由區塊新增上傳接口
+@app.route('/api/upload_scoring', methods=['POST'])
+def upload_scoring():
+    global historical_scores
+    data = request.json
+    scores_data = data.get('scores', [])
+    # 建立對應表，例如：{"第01桌": 10, "第02桌": 5}
+    historical_scores = {item['name']: item['score'] for item in scores_data}
+    return jsonify({'success': True, 'count': len(historical_scores)})
+
+# 在 socket 事件區塊新增「顯示總結算」的指令
+@socketio.on('admin_show_final_total')
+def on_admin_show_final_total():
+    # 1. 取得本場遊戲的原始分數排名
+    current_ranking = _get_full_ranking()
+    
+    # 2. 計算本場的名次積分 (與 admin_show_rank_points 邏輯相同：第一名 19分, 第二名 18分...)
+    current_game_points = {}
+    temp_rank = 1
+    for i in range(len(current_ranking)):
+        if i > 0 and current_ranking[i]['score'] == current_ranking[i-1]['score']:
+            points = 19 - temp_rank
+        else:
+            temp_rank = i + 1
+            points = 19 - temp_rank
+        current_game_points[current_ranking[i]['name']] = points
+
+    # 3. 加總歷史積分與本場名次積分 (統計 1-19 桌)
+    final_combined = []
+    for i in range(1, 19):
+        name = f"第{i:02d}桌"
+        h_score = historical_scores.get(name, 0)
+        c_score = current_game_points.get(name, 0)
+        final_combined.append({
+            'name': name,
+            'historical_score': h_score,
+            'current_game_score': c_score,
+            'total_score': h_score + c_score
+        })
+
+    # 4. 根據總積分排序
+    final_combined.sort(key=lambda x: (-x['total_score'], x['name']))
+    
+    # 5. 廣播新事件給大螢幕
+    socketio.emit('show_final_grand_total', {'ranking': final_combined})
 
 def _finish_game():
     game_state['status'] = 'finished'
