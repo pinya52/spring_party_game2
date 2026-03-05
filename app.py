@@ -494,26 +494,38 @@ def upload_scoring():
 # 在 socket 事件區塊新增「顯示總結算」的指令
 @socketio.on('admin_show_final_total')
 def on_admin_show_final_total():
-    # 1. 取得本場遊戲的原始分數排名
+    # 1. 取得本場遊戲的原始分數排名 (由高到低)
     current_ranking = _get_full_ranking()
     
-    # 2. 計算本場的名次積分 (與 admin_show_rank_points 邏輯相同：第一名 19分, 第二名 18分...)
+    # 2. 計算本場的名次積分 (同分者名次相同，給予相同積分)
+    # 邏輯：第1名得19分, 第2名得18分... 依此類推
     current_game_points = {}
-    temp_rank = 1
-    for i in range(len(current_ranking)):
-        if i > 0 and current_ranking[i]['score'] == current_ranking[i-1]['score']:
-            points = 19 - temp_rank
+    last_score = -1
+    last_rank_points = -1
+    
+    for i, entry in enumerate(current_ranking):
+        # 判斷是否與前一人同分
+        if entry['score'] == last_score:
+            # 同分者得到與前一人相同的名次積分
+            points = last_rank_points
         else:
-            temp_rank = i + 1
-            points = 19 - temp_rank
-        current_game_points[current_ranking[i]['name']] = points
+            # 不同分，則根據目前索引位置計算 (20 - 實際名次)
+            points = 20 - (i + 1)
+        
+        current_game_points[entry['name']] = points
+        last_score = entry['score']
+        last_rank_points = points
 
-    # 3. 加總歷史積分與本場名次積分 (統計 1-19 桌)
+    # 3. 加總歷史積分與本場名次積分
     final_combined = []
+    # 遍歷 1-18 桌 (對應您最新的桌數設定)
     for i in range(1, 19):
         name = f"第{i:02d}桌"
+        # 從全域變數 historical_scores 取得上傳的 CSV 分數
         h_score = historical_scores.get(name, 0)
+        # 從剛剛計算的對應表取得本場積分
         c_score = current_game_points.get(name, 0)
+        
         final_combined.append({
             'name': name,
             'historical_score': h_score,
@@ -521,10 +533,10 @@ def on_admin_show_final_total():
             'total_score': h_score + c_score
         })
 
-    # 4. 根據總積分排序
+    # 4. 根據「總積分」重新排序，總分相同則按桌號排序
     final_combined.sort(key=lambda x: (-x['total_score'], x['name']))
     
-    # 5. 廣播新事件給大螢幕
+    # 5. 廣播給大螢幕顯示
     socketio.emit('show_final_grand_total', {'ranking': final_combined})
 
 def _finish_game():
