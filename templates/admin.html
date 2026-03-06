@@ -262,7 +262,8 @@ function uploadCSV() {
         questions.push({
           description: parts[0],
           options: [parts[1], parts[2], parts[3], parts[4]],
-          correct: parts[5].toUpperCase()
+          correct: parts[5].toUpperCase(),
+          category: parts[6] || '一般題'  // 💡 新增：讀取第 7 欄作為題目類型，若未填則預設為「一般題」
         });
       }
     }

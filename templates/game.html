@@ -424,7 +424,7 @@ socket.on('show_question', data => {
   
   showScreen('screenQuestion');
   document.getElementById('phoneQNum').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
-  document.getElementById('phoneQText').textContent = data.description;
+  document.getElementById('phoneQText').textContent = data.category || '一般題';
   let cd = 5; const el = document.getElementById('phoneCd'); el.textContent = cd;
   const t = setInterval(() => { cd--; if (cd <= 0) { clearInterval(t); showScreen('screenDrawing'); } else el.textContent = cd; }, 1000);
 });

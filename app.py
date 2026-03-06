@@ -179,7 +179,8 @@ def api_get_game_state():
             'total': len(game_state['questions']),
             'description': q['description'],
             'options': q['options'],
-            'correct': q['correct'] if game_state['status'] == 'result' else None
+            'correct': q['correct'] if game_state['status'] == 'result' else None,
+            'category': q.get('category', '一般題') # 💡 新增這行
         }
     
     # 計算剩餘時間
@@ -479,8 +480,14 @@ def _auto_show_result():
 def _show_question():
     game_state['status'] = 'question'
     q = _current_question()
-    socketio.emit('show_question', {'index': game_state['current_question'], 'total': len(game_state['questions']), 'description': q['description'], 'options': q['options']})
-
+    socketio.emit('show_question', {
+        'index': game_state['current_question'], 
+        'total': len(game_state['questions']), 
+        'description': q['description'], 
+        'options': q['options'],
+        'category': q.get('category', '一般題') # 💡 新增：把類型傳給前端
+    })
+    
 # 在 app.py 的路由區塊新增上傳接口
 @app.route('/api/upload_scoring', methods=['POST'])
 def upload_scoring():

@@ -199,9 +199,9 @@ socket.on('show_question', data => {
   currentQuestion = data;
   showScreen('screenQuestion');
   document.getElementById('qNumber').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
-  document.getElementById('qText').textContent = data.description;
+  document.getElementById('qText').textContent = data.category || '一般題';
   document.getElementById('drawQLabel').textContent = `第 ${data.index+1} 題 / 共 ${data.total} 題`;
-  document.getElementById('drawQBanner').textContent = data.description;
+  document.getElementById('drawQBanner').textContent = data.category || '一般題';
   document.getElementById('drawStatus').textContent = '⏳ 等待開始創作';
 
   let count = 5;
