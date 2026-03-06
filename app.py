@@ -4,6 +4,7 @@ import io
 import re
 import time
 import requests as http_requests
+import fal_client
 
 from flask import Flask, render_template, request, jsonify
 from flask_socketio import SocketIO, emit
@@ -56,79 +57,36 @@ def process_image(image_data_url, style):
     pass # 備用濾鏡
 
 def diffusion_generate(image_data_url, style):
-    header, b64 = image_data_url.split(',', 1)
-    raw = base64.b64decode(b64)
-    img = Image.open(io.BytesIO(raw)).convert('RGB')
-    
-    img_byte_arr = io.BytesIO()
-    img.save(img_byte_arr, format='PNG')
-    source_image_base64 = base64.b64encode(img_byte_arr.getvalue()).decode('utf-8')
-
+    # 1. 定義風格提示詞
     STYLE_PROMPTS = {
-        'realistic':  'high quality photo, colorful, detailed, realistic style',
-        'ghibli':     'studio ghibli anime style, colorful, soft lighting, high quality',
-        'watercolor': 'watercolor painting, soft colors, transparent wash, high quality',
-        'comic':      'manga comic style, bold lines, colorful, high quality',
-        'oil':        'oil painting, thick brushstrokes, vivid colors, high quality',
-        'scifi':      'sci-fi concept art, neon colors, futuristic, high quality',
+        'realistic':  'masterpiece, high quality photo, realistic, highly detailed',
+        'ghibli':     'studio ghibli style, anime, lush colors, whimsical',
+        'watercolor': 'watercolor painting, artistic, soft edges, paper texture',
+        'comic':      'american comic book style, bold lines, vibrant',
+        'oil':        'thick oil painting, impasto, canvas texture, classic',
+        'scifi':      'futuristic sci-fi, neon, cyberpunk, high tech',
     }
     prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS['realistic'])
-    NEGATIVE_PROMPT = 'blurry, ugly, distorted, deformed, low quality, watermark, text'
 
-    submit_url = "https://aihorde.net/api/v2/generate/async"
-    req_headers = {
-        "apikey": "0000000000", 
-        "Content-Type": "application/json",
-        "Client-Agent": "pictureguess:1.0",
-    }
-    
-    payload = {
-        "prompt": prompt + " ### " + NEGATIVE_PROMPT,
-        "params": {
-            "width": 512, "height": 512, "steps": 20, "sampler_name": "k_euler_a", "n": 1,
-        },
-        "nsfw": False,
-        "censor_nsfw": True,
-        "source_image": source_image_base64, 
-        "source_processing": "img2img",
-    }
-    
-    resp = http_requests.post(submit_url, headers=req_headers, json=payload, timeout=30)
-    if resp.status_code != 202:
-        raise Exception(f"提交給 AI Horde 失敗，伺服器忙碌中。")
-    
-    job_id = resp.json().get("id")
+    # 2. 呼叫 Fal.ai 的 LCM 草圖轉圖像 API
+    # 這裡直接傳入大螢幕畫布的 base64 (image_data_url)
+    handler = fal_client.submit(
+        "fal-ai/lcm-sd15-scribble",
+        arguments={
+            "prompt": prompt,
+            "image_url": image_data_url, 
+            "num_inference_steps": 4,     # LCM 只需要 4 步，速度極快
+            "guidance_scale": 1.5,
+        }
+    )
+    result = handler.get()
+    image_url = result['images'][0]['url']
 
-    check_url  = f"https://aihorde.net/api/v2/generate/check/{job_id}"
-    status_url = f"https://aihorde.net/api/v2/generate/status/{job_id}"
-    
-    for i in range(25):
-        time.sleep(3)
-        try:
-            check = http_requests.get(check_url, headers=req_headers, timeout=10).json()
-        except Exception: continue
-        if check.get("faulted"): raise Exception("AI 繪圖任務失敗，請重試。")
-        if check.get("done"): break
-    else:
-        raise Exception("排隊人數較多，生成逾時，請再試一次。")
+    # 3. 取得圖片網址後，下載並轉回 base64，以相容你現有的前端機制
+    response = http_requests.get(image_url)
+    encoded_string = base64.b64encode(response.content).decode('utf-8')
 
-    result = http_requests.get(status_url, headers=req_headers, timeout=30).json()
-    generations = result.get("generations", [])
-    if not generations: raise Exception("未取得生成結果。")
-
-    img_data = generations[0].get("img", "")
-    if img_data.startswith("http"):
-        img_resp = http_requests.get(img_data, timeout=30)
-        raw_result = img_resp.content
-    else:
-        if "," in img_data: img_data = img_data.split(",", 1)[1]
-        raw_result = base64.b64decode(img_data)
-
-    result_img = Image.open(io.BytesIO(raw_result)).convert('RGB')
-    out_buf = io.BytesIO()
-    result_img.save(out_buf, format='PNG')
-    
-    return "data:image/png;base64," + base64.b64encode(out_buf.getvalue()).decode()
+    return f"data:image/png;base64,{encoded_string}"
 
 def get_uid_by_sid(sid):
     for uid, p in game_state['participants'].items():

@@ -13,3 +13,4 @@ gevent
 gevent-websocket
 google-genai
 pillow
+fal-client
