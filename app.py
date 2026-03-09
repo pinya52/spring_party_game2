@@ -105,7 +105,7 @@ def diffusion_generate(image_data_url, style):
         "fal-ai/nano-banana-2/edit",
         arguments={
             "prompt": prompt,
-            "image_urls": image_data_url,
+            "image_urls": [image_data_url],
             "resolution": "0.5K"
         },
         with_logs=True,

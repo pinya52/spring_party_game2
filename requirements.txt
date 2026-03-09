@@ -2,15 +2,15 @@ flask==3.0.0
 flask-socketio==5.3.6
 flask-cors==4.0.0
 # Pillow==10.2.0
-numpy==1.26.0
-opencv-python-headless==4.9.0.80
-python-engineio==4.8.0
-python-socketio==5.10.0
-gunicorn==21.2.0
-eventlet==0.35.1
+numpy==1.26.2
+# opencv-python-headless==4.9.0.80
+# python-engineio==4.8.0
+# python-socketio==5.10.0
+# gunicorn==21.2.0
+# eventlet==0.35.1
 requests==2.31.0
-gevent
-gevent-websocket
-google-genai
+# gevent
+# gevent-websocket
+# google-genai
 pillow
 fal-client
