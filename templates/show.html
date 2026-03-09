@@ -252,12 +252,12 @@ socket.on('start_answering', data => {
   if (hasAI) {
     singleImg.style.display = 'none';
     dualContainer.style.display = 'flex';
-    document.getElementById('ansImageCanvas').src = data.canvas_image;
-    document.getElementById('ansImageAI').src = data.ai_image;
+    document.getElementById('ansImageCanvas').src = lastCanvasImage
+    document.getElementById('ansImageAI').src = lastAIImage;
   } else {
     singleImg.style.display = 'block';
     dualContainer.style.display = 'none';
-    singleImg.src = data.image || '';
+    singleImg.src = lastAIImage || lastCanvasImage || '';
   }
 
   const colors = ['red-box','green-box','yellow-box','blue-box'];
