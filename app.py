@@ -12,6 +12,8 @@ from flask_cors import CORS
 from PIL import Image, ImageFilter, ImageEnhance, ImageOps
 import numpy as np
 
+api_key = os.getenv('FAL_KEY')
+
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'pictureguess-secret-2024')
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -56,10 +58,11 @@ def optimize_image_for_transfer(img, max_size=600, quality=75):
 def process_image(image_data_url, style):
     pass # 備用濾鏡
 
+    
 def on_queue_update(update):
     if isinstance(update, fal_client.InProgress):
         for log in update.logs:
-           print(log["message"])
+            print(log["message"])
 
 def diffusion_generate(image_data_url, style):
     # 1. 定義風格提示詞
@@ -97,11 +100,6 @@ def diffusion_generate(image_data_url, style):
     # request_id = handler.request_id
     
     # status = fal_client.status("bria/fibo-edit/sketch_to_colored_image", request_id, with_logs=True)
-    
-    def on_queue_update(update):
-        if isinstance(update, fal_client.InProgress):
-            for log in update.logs:
-                print(log["message"])
 
     result = fal_client.subscribe(
         "fal-ai/nano-banana-2/edit",
