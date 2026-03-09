@@ -112,13 +112,13 @@ def diffusion_generate(image_data_url, style):
         on_queue_update=on_queue_update,
     )
 
-    image_url = result['images'][0]['url']
+    # image_url = result['images'][0]['url']
 
-    # 3. 取得圖片網址後，下載並轉回 base64，以相容你現有的前端機制
-    response = http_requests.get(image_url)
-    encoded_string = base64.b64encode(response.content).decode('utf-8')
+    # # 3. 取得圖片網址後，下載並轉回 base64，以相容你現有的前端機制
+    # response = http_requests.get(image_url)
+    # encoded_string = base64.b64encode(response.content).decode('utf-8')
 
-    return f"data:image/png;base64,{encoded_string}"
+    return result['images'][0]['url']
 
 def get_uid_by_sid(sid):
     for uid, p in game_state['participants'].items():
