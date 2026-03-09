@@ -43,7 +43,7 @@ game_state = {
     'answer_duration': 20   # 新增總時間長度
 }
 
-MAX_PARTICIPANTS = 19
+MAX_PARTICIPANTS = 18
 MAX_QUESTIONS = 50
 
 def optimize_image_for_transfer(img, max_size=600, quality=75):
@@ -55,6 +55,11 @@ def optimize_image_for_transfer(img, max_size=600, quality=75):
 
 def process_image(image_data_url, style):
     pass # 備用濾鏡
+
+def on_queue_update(update):
+    if isinstance(update, fal_client.InProgress):
+        for log in update.logs:
+           print(log["message"])
 
 def diffusion_generate(image_data_url, style):
     # 1. 定義風格提示詞
@@ -70,16 +75,45 @@ def diffusion_generate(image_data_url, style):
 
     # 2. 呼叫 Fal.ai 的 LCM 草圖轉圖像 API
     # 這裡直接傳入大螢幕畫布的 base64 (image_data_url)
-    handler = fal_client.submit(
-        "fal-ai/lcm-sd15-scribble",
+    # handler = fal_client.submit(
+    #     "fal-ai/lcm-sd15-scribble",
+    #     arguments={
+    #         "prompt": prompt,
+    #         "image_url": image_data_url, 
+    #         "num_inference_steps": 4,     # LCM 只需要 4 步，速度極快
+    #         "guidance_scale": 1.5,
+    #     }
+    # )
+    
+    # handler = fal_client.submit(
+    #     "bria/fibo-edit/sketch_to_colored_image",
+    #     arguments={
+    #         "image_url": image_data_url,
+    #         "artistic_style": prompt,
+    #     },
+    #     webhook_url="https://optional.webhook.url/for/results",
+    # )
+
+    # request_id = handler.request_id
+    
+    # status = fal_client.status("bria/fibo-edit/sketch_to_colored_image", request_id, with_logs=True)
+    
+    def on_queue_update(update):
+        if isinstance(update, fal_client.InProgress):
+            for log in update.logs:
+                print(log["message"])
+
+    result = fal_client.subscribe(
+        "fal-ai/nano-banana-2/edit",
         arguments={
             "prompt": prompt,
-            "image_url": image_data_url, 
-            "num_inference_steps": 4,     # LCM 只需要 4 步，速度極快
-            "guidance_scale": 1.5,
-        }
+            "image_urls": image_data_url,
+            "resolution": "0.5K"
+        },
+        with_logs=True,
+        on_queue_update=on_queue_update,
     )
-    result = handler.get()
+
     image_url = result['images'][0]['url']
 
     # 3. 取得圖片網址後，下載並轉回 base64，以相容你現有的前端機制
