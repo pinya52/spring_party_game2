@@ -411,12 +411,12 @@ function startFireworks() {
     requestAnimationFrame(loop);
   }
   loop(); setTimeout(() => clearInterval(burstInterval), 15000);
-
-  // 👇 新增：當收到後端廣播「重置遊戲」時，大螢幕直接重新載入，回到初始等待畫面
-  socket.on('game_reset', () => {
-      window.location.reload();
-  });
 }
+
+// 👇 新增：當收到後端廣播「重置遊戲」時，大螢幕直接重新載入，回到初始等待畫面
+socket.on('game_reset', () => {
+    window.location.reload();
+});
 
 // 在 show.html 的 <script> 區塊新增監聽
 socket.on('show_final_grand_total', data => {

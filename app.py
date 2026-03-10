@@ -167,6 +167,7 @@ def api_get_game_state():
         q = _current_question()
         q_data = {
             'index': game_state['current_question'],
+            'login_open': game_state.get('login_open', False),
             'total': len(game_state['questions']),
             'description': q['description'],
             'options': q['options'],
