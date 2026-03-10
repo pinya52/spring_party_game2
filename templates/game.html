@@ -410,20 +410,6 @@ socket.on('kicked', () => {
   setError(''); showToast('您已被管理員移除，請重新輸入桌號'); showScreen('screenLogin');
 });
 
-{% comment %} // 👇 修正：收到重置遊戲指令時，徹底清空紀錄並踢回登入畫面
-socket.on('game_reset', () => { 
-    myName = ''; 
-    localStorage.removeItem('my_table_number'); 
-    localStorage.removeItem('last_phase'); 
-    localStorage.removeItem('answered_q_index'); 
-    localStorage.removeItem('pending_result'); // 💡 遊戲重置，清空收據
-    document.getElementById('nameInput').value = ''; 
-    clearInterval(timerInterval);
-    
-    showToast('遊戲已重置，請重新加入');
-    showScreen('screenLogin'); 
-}); {% endcomment %}
-
 socket.on('join_error', data => setError(data.message));
 
 socket.on('join_success', data => {
