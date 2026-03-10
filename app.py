@@ -33,6 +33,7 @@ historical_scores = {}
 
 game_state = {
     'status': 'waiting',
+    'login_open': False,
     'questions': [],
     'current_question': 0,
     'participants': {}, 
@@ -218,7 +219,7 @@ def api_diffusion():
 
 @app.route('/api/reset', methods=['POST'])
 def api_reset():
-    game_state.update({'status': 'waiting', 'questions': [], 'current_question': 0, 'participants': {}, 'answers': {}, 'canvas_data': None, 'ai_image': None})
+    game_state.update({'status': 'waiting', 'login_open': False, 'questions': [], 'current_question': 0, 'participants': {}, 'answers': {}, 'canvas_data': None, 'ai_image': None})
     socketio.emit('game_reset', {})
     return jsonify({'success': True})
 
@@ -226,6 +227,7 @@ def api_reset():
 def on_connect():
     emit('game_state', {
         'status': game_state['status'],
+        'login_open': game_state.get('login_open', False), # 💡 新增這行
         'participants': [{'sid': v['sid'], 'name': v['name'], 'score': v['score']} for v in game_state['participants'].values()],
         'current_question': game_state['current_question'],
         'total_questions': len(game_state['questions']),
@@ -244,6 +246,12 @@ def on_disconnect():
             socketio.emit('answer_progress', {'answered': answered_count, 'total': total_count})
             if answered_count >= total_count and total_count > 0:
                 _auto_show_result()
+                
+# 💡 新增：管理員按下開放登入
+@socketio.on('admin_open_login')
+def on_admin_open_login():
+    game_state['login_open'] = True
+    socketio.emit('login_opened') # 廣播給所有手機：可以登入了！
 
 @socketio.on('join_game')
 def on_join_game(data):

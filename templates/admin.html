@@ -116,6 +116,7 @@
       目前題目：<span id="qProgressLabel">- / -</span>
     </div>
     
+    <button class="btn" style="background: #0ea5e9; color: white;" onclick="socket.emit('admin_open_login')">🔓 1. 開放手機登入</button>
     <button class="btn btn-primary" onclick="socket.emit('admin_start_game')">▶️ 開始遊戲 (第一題)</button>
     <button class="btn btn-success" onclick="socket.emit('admin_open_answer')">🔓 開放手機答題 (20秒)</button>
     <button class="btn btn-outline" onclick="socket.emit('admin_show_result')">📊 提前公布解答</button>
