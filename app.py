@@ -167,7 +167,6 @@ def api_get_game_state():
         q = _current_question()
         q_data = {
             'index': game_state['current_question'],
-            'login_open': game_state.get('login_open', False),
             'total': len(game_state['questions']),
             'description': q['description'],
             'options': q['options'],
@@ -190,6 +189,7 @@ def api_get_game_state():
 
     return jsonify({
         'phase': game_state['status'],
+        'login_open': game_state.get('login_open', False),
         'personal_answered': personal_answered, 
         'last_receipt': last_receipt, # 💡 終極防禦 3：將收據一併傳給手機
         'players': _get_full_ranking(),
