@@ -240,7 +240,7 @@ socket.on('ai_image_generated', data => {
   const styleNames = {realistic:'📸寫實',ghibli:'🏡吉卜力',comic:'💥漫畫',watercolor:'💧水彩',oil:'🖼️油畫',scifi:'🚀科幻'};
   document.getElementById('showCanvas').src = data.image;
   document.getElementById('drawStatus').textContent = `🤖 AI 圖片已完成 — ${styleNames[data.style] || data.style}`;
-  if (data.description) document.getElementById('drawQBanner').textContent = data.description;
+  if (data.category) document.getElementById('drawQBanner').textContent = data.category;
   showScreen('screenDrawing');
 });
 
@@ -425,7 +425,7 @@ socket.on('game_reset', () => {
 // 在 show.html 的 <script> 區塊新增監聽
 socket.on('show_final_grand_total', data => {
   showScreen('screenFinished');
-  document.getElementById('finishedTitle').textContent = '🏆 年度總積分結算 🏆';
+  document.getElementById('finishedTitle').textContent = '🏆遊戲總積分結算 🏆';
   
   const podium = document.getElementById('finalPodium');
   const restContainer = document.getElementById('restRanking');

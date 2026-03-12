@@ -212,7 +212,7 @@ def api_diffusion():
         game_state['ai_image'] = result
         game_state['ai_style'] = data.get('style')
         q = game_state['questions'][game_state['current_question']] if game_state['questions'] else {}
-        socketio.emit('ai_image_generated', {'image': result, 'style': data.get('style'), 'description': q.get('description', '')})
+        socketio.emit('ai_image_generated', {'image': result, 'style': data.get('style'), 'category': q.get('category', '一般題')})
         return jsonify({'success': True, 'image': result})
     except Exception as e:
         error_msg = str(e)
