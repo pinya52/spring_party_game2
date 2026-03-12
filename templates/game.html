@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>你畫我猜</title>
+<title>春酒靈魂畫手</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
@@ -167,7 +167,7 @@
 
 <div class="screen" id="screenLogin">
   <div class="logo">🎮</div>
-  <div class="logo-title">你畫我猜</div>
+  <div class="logo-title">春酒靈魂畫手</div>
   <div class="logo-sub">多人線上猜圖遊戲</div>
   <div class="conn-indicator"><div class="dot" id="connDot"></div><span id="connText">連線中...</span></div>
   <div class="login-card">
@@ -607,7 +607,7 @@ function renderLeaderboard(rankingData) {
       players[i].rankPoints = players[i - 1].rankPoints;
     } else {
       currentRank = i + 1;
-      players[i].rankPoints = 20 - currentRank; 
+      players[i].rankPoints = (20 - currentRank) * 3; 
     }
     players[i].displayRank = currentRank; 
   }

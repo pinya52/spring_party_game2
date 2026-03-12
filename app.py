@@ -516,7 +516,7 @@ def on_admin_show_final_total():
             points = last_rank_points
         else:
             # 不同分，則根據目前索引位置計算 (20 - 實際名次)
-            points = 20 - (i + 1)
+            points = (19 - (i + 1)) * 3
         
         current_game_points[entry['name']] = points
         last_score = entry['score']
