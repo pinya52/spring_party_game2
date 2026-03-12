@@ -43,7 +43,17 @@
   
   /* 💡 因為省下了一整行，畫布高度直接解放，飆升到 88vh！ */
   .draw-canvas-wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 1vh 2vw 2vh; width: 100%; }
-  #showCanvas { max-width: 98vw; max-height: 88vh; border-radius: 16px; box-shadow: 0 0 80px rgba(168,85,247,0.3); object-fit: contain; }
+  #showCanvas { 
+      max-width: 99vw; 
+      max-height: 92vh; 
+      height: 100%;               /* 💡 讓空畫布也能撐滿剩餘的高度 */
+      aspect-ratio: 4 / 3;        /* 💡 鎖定與控制台畫布完全相同的 4:3 完美比例 */
+      background-color: #ffffff;  /* 💡 還沒畫畫時，預設顯示乾淨的白色背景 */
+      color: transparent;         /* 💡 隱藏圖片為空時預設的破圖文字 */
+      border-radius: 8px; 
+      box-shadow: 0 0 20px rgba(168,85,247,0.5); 
+      object-fit: contain; 
+  }
 
   #screenAnswering { background: #050508; justify-content: flex-start; }
   .ans-top { flex: 0 0 44%; width: 100%; position: relative; overflow: hidden; display: flex; justify-content: center; align-items: center; }
