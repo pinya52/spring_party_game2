@@ -223,25 +223,37 @@ socket.on('start_drawing_timer', data => {
   const leftEl = document.getElementById('sideTimerLeft');
   const rightEl = document.getElementById('sideTimerRight');
   
+  if (!leftEl || !rightEl) return; // 確保元素存在
+
   leftEl.style.display = 'block'; 
   rightEl.style.display = 'block';
   leftEl.textContent = remaining; 
   rightEl.textContent = remaining;
   
-  clearInterval(drawTimerInterval); // 如果重複按，會先清空舊的計時器
-  playBeep(1000, 0.1); // 啟動時發出提示音
+  clearInterval(drawTimerInterval); // 清空舊的計時器
+  
+  // 💡 安全防護：嘗試播放音效，就算失敗也不會卡住計時器
+  try { if (typeof playBeep === 'function') playBeep(1000, 0.1); } catch(e) { console.log(e); }
 
   drawTimerInterval = setInterval(() => {
-    remaining--;
+    remaining--; // 數字減 1
+    
     if (remaining > 0) {
+      // 更新畫面數字
       leftEl.textContent = remaining; 
       rightEl.textContent = remaining;
-      if (remaining <= 5) playBeep(800, 0.15); // 最後 5 秒播放滴答聲
+      
+      // 💡 安全防護：最後 5 秒嘗試播放滴答聲
+      try { if (remaining <= 5 && typeof playBeep === 'function') playBeep(800, 0.15); } catch(e) {}
     } else {
+      // 倒數結束，顯示 0
       leftEl.textContent = '0'; 
       rightEl.textContent = '0';
-      playBeep(400, 0.6); // 結束長音
-      clearInterval(drawTimerInterval);
+      
+      // 💡 安全防護：嘗試播放結束長音
+      try { if (typeof playBeep === 'function') playBeep(400, 0.6); } catch(e) {}
+      
+      clearInterval(drawTimerInterval); // 停止計時
       
       // 2 秒後自動隱藏數字
       setTimeout(() => { 
@@ -249,7 +261,7 @@ socket.on('start_drawing_timer', data => {
           rightEl.style.display = 'none'; 
       }, 2000);
     }
-  }, 1000);
+  }, 1000); // 每 1000 毫秒 (1秒) 執行一次
 });
 
 // 💡 確保切換題目（清空畫布）時，也會強制把數字隱藏
