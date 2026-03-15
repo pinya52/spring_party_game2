@@ -175,7 +175,6 @@
     <div style="width:1px; height:24px; background:#334155; margin:0 8px;"></div>
     
     <button class="btn btn-outline" id="undoBtn" style="width:auto; padding:8px 16px; margin:0;">↩ 復原</button>
-    <button class="btn btn-warning" onclick="socket.emit('admin_trigger_timer')" style="width:auto; padding:8px 16px; margin:0;">⏱️ 啟動畫布 15 秒倒數</button>
     <button class="btn btn-outline" onclick="clearCanvas()" style="width:auto; padding:8px 16px; margin:0;">🗑️ 清空畫布</button>
     <button class="btn btn-outline" id="fullscreenBtn" style="width:auto; padding:8px 16px; margin:0;" title="切換全螢幕">⛶ 全螢幕</button>
     
@@ -190,6 +189,7 @@
       </select>
       <button class="btn btn-accent" style="width:auto; padding:8px 24px; margin:0;" onclick="generateAI()">✨ AI 魔法增強</button>
     </div>
+    <button class="btn btn-warning" onclick="socket.emit('admin_trigger_timer')">⏱️ 啟動畫布 15 秒倒數</button>
   </div>
 
   <div class="canvas-container" id="canvasWrap">
