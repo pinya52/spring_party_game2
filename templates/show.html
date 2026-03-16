@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>大螢幕展示 — 春酒靈魂畫手</title>
+<title>大螢幕展示 — 靈魂畫手</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Bebas+Neue&family=Space+Mono:wght@700&display=swap" rel="stylesheet">
 <style>
@@ -140,7 +140,7 @@
 
 <div class="screen" id="screenWaiting">
   <div class="orbit"></div><div class="orbit orbit2"></div>
-  <div class="waiting-title">春酒靈魂畫手</div>
+  <div class="waiting-title">靈魂畫手</div>
   <img src="/static/game_qr.png" alt="Game QR Code" onerror="this.style.display='none'" style="width: 15vw; height: 15vw; border-radius: 16px; border: 4px solid var(--accent); box-shadow: 0 0 40px rgba(168,85,247,0.4); margin-bottom: 20px; z-index: 1;">
   <div style="font-size: 1.4vw; max-width: 60vw; text-align: center; line-height: 1.6; color: #ccc; margin-bottom: 30px; z-index: 1;">
     掃描上方 QR Code 並輸入桌號加入遊戲！<br>
@@ -166,8 +166,8 @@
     <div class="draw-status" id="drawStatus">⏳ 等待開始創作</div>
   </div>
 
-  <div id="sideTimerLeft" class="side-timer" style="display: none;">15</div>
-  <div id="sideTimerRight" class="side-timer" style="display: none;">15</div>
+  <div id="sideTimerLeft" class="side-timer" style="display: none;">10</div>
+  <div id="sideTimerRight" class="side-timer" style="display: none;">10</div>
 
   <div class="draw-canvas-wrap">
     <img id="showCanvas" src="" alt="繪圖區域">
@@ -219,7 +219,7 @@ let drawTimerInterval = null; // 💡 畫布倒數的計時器
 
 // 💡 接收啟動倒數事件
 socket.on('start_drawing_timer', data => {
-  let remaining = data.duration || 15;
+  let remaining = data.duration || 10;
   const leftEl = document.getElementById('sideTimerLeft');
   const rightEl = document.getElementById('sideTimerRight');
   
@@ -507,7 +507,7 @@ function startFireworks() {
     }
     requestAnimationFrame(loop);
   }
-  loop(); setTimeout(() => clearInterval(burstInterval), 15000);
+  loop(); setTimeout(() => clearInterval(burstInterval), 10000);
 }
 
 // 👇 新增：當收到後端廣播「重置遊戲」時，大螢幕直接重新載入，回到初始等待畫面

@@ -367,10 +367,10 @@ def on_admin_open_answer():
         'duration': game_state.get('answer_duration', 20),
     })
     
-# 💡 新增：接收管理員觸發 15 秒倒數的指令
+# 💡 新增：接收管理員觸發 10 秒倒數的指令
 @socketio.on('admin_trigger_timer')
 def on_admin_trigger_timer():
-    socketio.emit('start_drawing_timer', {'duration': 15})
+    socketio.emit('start_drawing_timer', {'duration': 10})
 
 @socketio.on('admin_switch_image')
 def on_admin_switch_image(data):
